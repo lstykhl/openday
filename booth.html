@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>樂善堂楊葛小琳中學開放日 2026 - 攤位動態 QR Code 顯示器</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700;900&display=swap" rel="stylesheet">
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Space Grotesk', 'sans-serif'] },
+          colors: {
+            'neo-bg': '#FFFDF5',
+            'neo-black': '#000000',
+            'neo-red': '#FF6B6B',
+            'neo-yellow': '#FFD93D',
+            'neo-violet': '#C4B5FD',
+          },
+          boxShadow: {
+            'neo-sm': '4px 4px 0px 0px #000000',
+            'neo-md': '6px 6px 0px 0px #000000',
+            'neo-lg': '8px 8px 0px 0px #000000',
+            'neo-xl': '12px 12px 0px 0px #000000',
+            'neo-2xl': '16px 16px 0px 0px #000000',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      background-color: #FFFDF5;
+      background-image: radial-gradient(#000000 2px, transparent 2.5px);
+      background-size: 30px 30px;
+    }
+  </style>
+</head>
+<body class="text-neo-black font-sans min-h-screen flex flex-col justify-between p-6 select-none selection:bg-neo-yellow">
+
+  <header class="flex justify-between items-center max-w-4xl mx-auto w-full">
+    <div class="flex items-center gap-3">
+      <span class="font-black text-sm uppercase bg-neo-black text-white px-3 py-1.5 border-2 border-neo-black shadow-neo-sm">選擇攤位</span>
+      <select id="booth-select" onchange="changeBooth()" class="font-black text-xl bg-neo-yellow border-4 border-neo-black p-2 shadow-neo-sm focus:outline-none cursor-pointer">
+      </select>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <div class="bg-white border-4 border-neo-black px-4 py-2 shadow-neo-sm font-black text-sm flex items-center gap-2">
+        <span class="w-3 h-3 bg-emerald-500 rounded-full border-2 border-neo-black animate-ping"></span>
+        QR 碼倒數：<span id="refresh-timer" class="font-mono text-neo-red text-base">03:00</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-2xl mx-auto w-full my-auto py-8">
+    <div class="bg-white border-8 border-neo-black p-8 shadow-neo-2xl text-center space-y-6 relative -rotate-1">
+      
+      <div class="absolute -top-6 left-1/2 -translate-x-1/2 bg-neo-red border-4 border-neo-black px-6 py-1.5 font-black text-lg text-white uppercase tracking-widest rotate-2 shadow-neo-md">
+        請用手機開啟 WEB APP 掃描蓋印
+      </div>
+
+      <div class="pt-4 space-y-1">
+        <h1 id="booth-title" class="text-4xl font-black uppercase tracking-tight">攤位 B01</h1>
+        <p class="text-sm font-bold text-slate-600">請將手機鏡頭對準下方動態 QR Code</p>
+      </div>
+
+      <div class="flex justify-center my-6">
+        <div class="p-4 bg-neo-yellow border-8 border-neo-black shadow-neo-lg inline-block relative">
+          <div id="qrcode" class="bg-white p-4 border-4 border-neo-black"></div>
+        </div>
+      </div>
+
+      <div class="bg-neo-bg border-4 border-neo-black p-4 text-xs font-bold space-y-1 text-slate-700">
+        <p>⚡ 本 QR Code 與印章動態碼每 3 分鐘自動更新，防範遠端轉傳截圖</p>
+        <p>⚡ 時間容錯機制已啟用，確保連線穩定無誤</p>
+      </div>
+
+    </div>
+  </main>
+
+  <footer class="max-w-4xl mx-auto w-full flex justify-between items-end">
+    <div class="bg-neo-violet border-4 border-neo-black p-4 shadow-neo-lg rotate-2 max-w-xs">
+      <div class="font-black text-xs uppercase tracking-wider text-slate-800">相機無法開啟？印章動態碼：</div>
+      <div id="rescue-code" class="text-4xl font-black font-mono tracking-widest text-neo-black bg-white border-2 border-neo-black px-3 py-1 my-1 text-center">
+        ----
+      </div>
+      <div class="text-[10px] font-black text-slate-600">訪客可在手機「印章動態碼」輸入上方 4 位數字</div>
+    </div>
+
+    <div class="bg-white border-4 border-neo-black px-5 py-3 shadow-neo-md text-right font-black">
+      <div class="text-xs text-slate-500 uppercase tracking-wider">系統目前時間</div>
+      <div id="clock-display" class="text-2xl font-mono">14:30:00</div>
+    </div>
+  </footer>
+
+  <script>
+    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzA4Iuflm5N6faXsrUXPQ8Q68VNfcDysS_3ru281wLymPPxzt92fliq2k7Of0pIdCBcHw/exec";
+    let currentBooth = "B01";
+    let qrcodeInstance = null;
+    let countdownSeconds = 180;
+    let boothMap = {};
+
+    document.addEventListener('DOMContentLoaded', () => {
+      initBoothSelect();
+      fetchBoothNames();
+      updateQRCode();
+      startTimers();
+    });
+
+    function initBoothSelect() {
+      const select = document.getElementById('booth-select');
+      select.innerHTML = '';
+      for (let i = 1; i <= 17; i++) {
+        const id = 'B' + i.toString().padStart(2, '0');
+        const option = document.createElement('option');
+        option.value = id;
+        option.innerText = '地點 ' + id;
+        select.appendChild(option);
+      }
+    }
+
+    function fetchBoothNames() {
+      if (!GAS_API_URL || GAS_API_URL.includes("YOUR_GOOGLE_APPS_SCRIPT")) return;
+      fetch(GAS_API_URL)
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.booths) {
+            boothMap = data.booths;
+            updateBoothTitle();
+          }
+        }).catch(err => console.warn("Fetch booth error:", err));
+    }
+
+    function updateBoothTitle() {
+      const name = boothMap[currentBooth] || '';
+      const titleElem = document.getElementById('booth-title');
+      if (name) {
+        titleElem.innerText = currentBooth + ' ' + name;
+      } else {
+        titleElem.innerText = '攤位 ' + currentBooth;
+      }
+    }
+
+    function changeBooth() {
+      currentBooth = document.getElementById('booth-select').value;
+      updateBoothTitle();
+      countdownSeconds = 180;
+      updateQRCode();
+    }
+
+    // 隨機 Hash 演算法生成 4 位數 Pin 碼
+    function generateDynamicPin(boothNum, timeBlock) {
+      const SALT = 20261013;
+      let hash = (boothNum * 9301 + timeBlock * 49297 + SALT) % 233280;
+      hash = (hash * 9301 + 49297) % 233280;
+      return 1000 + (Math.abs(hash) % 9000);
+    }
+
+    function updateQRCode() {
+      const timeBlock = Math.floor(Date.now() / (1000 * 180));
+      const payload = 'booth:' + currentBooth + ':t:' + timeBlock;
+
+      const boothNum = parseInt(currentBooth.replace("B", ""));
+      const dynamicRescueCode = generateDynamicPin(boothNum, timeBlock);
+      document.getElementById('rescue-code').innerText = dynamicRescueCode;
+
+      const qrContainer = document.getElementById('qrcode');
+      qrContainer.innerHTML = '';
+
+      qrcodeInstance = new QRCode(qrContainer, {
+        text: payload,
+        width: 240,
+        height: 240,
+        colorDark: "#000000",
+        colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.H
+      });
+    }
+
+    function startTimers() {
+      setInterval(() => {
+        const now = new Date();
+        document.getElementById('clock-display').innerText = now.toTimeString().split(' ')[0];
+
+        countdownSeconds--;
+        if (countdownSeconds <= 0) {
+          countdownSeconds = 180;
+          updateQRCode();
+        }
+
+        const mins = Math.floor(countdownSeconds / 60).toString().padStart(2, '0');
+        const secs = (countdownSeconds % 60).toString().padStart(2, '0');
+        document.getElementById('refresh-timer').innerText = mins + ':' + secs;
+      }, 1000);
+    }
+  </script>
+</body>
+</html>
