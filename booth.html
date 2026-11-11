@@ -49,7 +49,6 @@
   <header class="flex justify-between items-center max-w-4xl mx-auto w-full">
     <div class="flex items-center gap-3">
       <span class="font-black text-sm uppercase bg-neo-black text-white px-3 py-1.5 border-2 border-neo-black shadow-neo-sm">選擇攤位</span>
-      <!-- 包含名稱的動態下拉選單 -->
       <select id="booth-select" onchange="changeBooth()" class="font-black text-lg bg-neo-yellow border-4 border-neo-black p-2 shadow-neo-sm focus:outline-none cursor-pointer max-w-md truncate">
       </select>
     </div>
@@ -71,18 +70,33 @@
 
       <div class="pt-4 space-y-1">
         <h1 id="booth-title" class="text-3xl font-black uppercase tracking-tight">載入中...</h1>
-        <p class="text-sm font-bold text-slate-600">請將手機鏡頭對準下方動態 QR Code</p>
+        <p class="text-sm font-bold text-slate-600">提示：點擊下方黃色區域即可顯示 QR Code</p>
       </div>
 
+      <!-- QR Code 容器與安全遮罩區塊 -->
       <div class="flex justify-center my-6">
-        <div class="p-4 bg-neo-yellow border-8 border-neo-black shadow-neo-lg inline-block relative">
+        <div class="p-4 bg-neo-yellow border-8 border-neo-black shadow-neo-lg inline-block relative overflow-hidden group">
+          
+          <!-- QR Code 圖像 -->
           <div id="qrcode" class="bg-white p-4 border-4 border-neo-black"></div>
+
+          <!-- 安全防防偷窺遮罩層 (Mask Overlay) -->
+          <div id="qr-mask" onclick="revealQRCode()" class="absolute inset-0 bg-neo-black border-4 border-neo-black flex flex-col items-center justify-center p-4 cursor-pointer transition-opacity duration-200 z-20">
+            <div class="text-5xl mb-2 animate-bounce">🔒</div>
+            <div class="bg-neo-yellow text-neo-black font-black text-lg px-4 py-2 border-4 border-neo-black shadow-neo-sm uppercase rotate-1">
+              點擊解鎖顯示 QR 碼
+            </div>
+            <div class="text-white font-bold text-xs mt-3 opacity-80">
+              (顯示 5 秒後將自動重新安全鎖定)
+            </div>
+          </div>
+
         </div>
       </div>
 
       <div class="bg-neo-bg border-4 border-neo-black p-4 text-xs font-bold space-y-1 text-slate-700">
-        <p>⚡ 本 QR Code 與印章動態碼每 3 分鐘自動更新，防範遠端轉傳截圖</p>
-        <p>⚡ 時間容錯機制已啟用，確保連線穩定無誤</p>
+        <p>⚡ 已啟用防偷拍防禦遮罩：點擊後僅臨時顯示 5 秒</p>
+        <p>⚡ 本 QR Code 與印章動態碼每 3 分鐘自動更新，防範截圖轉傳</p>
       </div>
 
     </div>
@@ -110,6 +124,7 @@
     let countdownSeconds = 180;
     let boothMap = {};
     let totalBooths = 19;
+    let maskTimeout = null;
 
     document.addEventListener('DOMContentLoaded', () => {
       initBoothSelect();
@@ -118,7 +133,22 @@
       startTimers();
     });
 
-    // 動態初始化下拉選單（包含編號與名稱）
+    // 點擊解鎖遮罩並啟動 5 秒自動重新鎖定計時器
+    function revealQRCode() {
+      const mask = document.getElementById('qr-mask');
+      mask.classList.add('opacity-0', 'pointer-events-none');
+
+      if (maskTimeout) clearTimeout(maskTimeout);
+      maskTimeout = setTimeout(() => {
+        hideQRCode();
+      }, 5000); // 5 秒後自動覆蓋遮罩
+    }
+
+    function hideQRCode() {
+      const mask = document.getElementById('qr-mask');
+      mask.classList.remove('opacity-0', 'pointer-events-none');
+    }
+
     function initBoothSelect() {
       const select = document.getElementById('booth-select');
       const savedValue = select.value || currentBooth;
@@ -153,7 +183,6 @@
             boothMap = data.booths;
             updated = true;
           }
-          // 當成功取得後端資料後，刷新下拉選單
           if (updated) {
             initBoothSelect();
           }
@@ -174,6 +203,7 @@
       currentBooth = document.getElementById('booth-select').value;
       updateBoothTitle();
       countdownSeconds = 180;
+      hideQRCode(); // 切換攤位時自動鎖定遮罩
       updateQRCode();
     }
 
