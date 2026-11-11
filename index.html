@@ -310,8 +310,10 @@
         localStorage.removeItem('redemption_status');
     }
 
-    let currentDisplayedMarquee = "";
+    // ⚡ 走馬燈無縫同步機制專用變數
+    let currentDisplayedMarquee = "⚡ 歡迎光臨學校開放日 2026！集齊印章自由選換 4 大獎品！";
     let pendingMarqueeText = null;
+    let isUpdatingMarquee = false;
 
     document.addEventListener('DOMContentLoaded', () => {
       if (!userRole) {
@@ -331,47 +333,57 @@
     function openMapModal() { document.getElementById('map-modal').classList.remove('hidden'); }
     function closeMapModal() { document.getElementById('map-modal').classList.add('hidden'); }
 
+    // ⚡ 走馬燈無縫循環及鎖定控制
     function initMarqueeSync() {
       const track = document.getElementById('marquee-track');
       if (!track) return;
 
       track.addEventListener('animationiteration', () => {
-        if (pendingMarqueeText !== null) {
-          renderMarqueeContent(pendingMarqueeText);
+        if (pendingMarqueeText !== null && !isUpdatingMarquee) {
+          safelyUpdateMarquee(pendingMarqueeText);
           pendingMarqueeText = null;
         }
       });
 
       document.addEventListener('visibilitychange', () => {
-        if (!document.hidden && pendingMarqueeText !== null) {
-          renderMarqueeContent(pendingMarqueeText);
+        if (!document.hidden && pendingMarqueeText !== null && !isUpdatingMarquee) {
+          safelyUpdateMarquee(pendingMarqueeText);
           pendingMarqueeText = null;
         }
       });
     }
 
-    function renderMarqueeContent(text) {
+    // ⚡ requestAnimationFrame 雙重 Frame 渲染防 Blank 核心函式
+    function safelyUpdateMarquee(text) {
       if (!text || typeof text !== 'string') return;
       const cleanText = text.trim();
       if (cleanText === "" || cleanText === currentDisplayedMarquee) return;
 
+      isUpdatingMarquee = true;
       currentDisplayedMarquee = cleanText;
+
       const formattedText = cleanText.startsWith("⚡") ? cleanText : "⚡ " + cleanText;
 
       const part1 = document.getElementById('marquee-part-1');
       const part2 = document.getElementById('marquee-part-2');
       const track = document.getElementById('marquee-track');
-      
-      if (part1 && part2) {
-        part1.innerText = formattedText;
-        part2.innerText = formattedText;
 
-        const charCount = formattedText.length;
-        const dynamicDuration = Math.min(50, Math.max(15, Math.round(15 + (charCount / 10) * 3)));
-        
-        if (track) {
+      if (part1 && part2 && track) {
+        requestAnimationFrame(() => {
+          part1.innerText = formattedText;
+          part2.innerText = formattedText;
+
+          const charCount = formattedText.length;
+          const dynamicDuration = Math.min(60, Math.max(18, Math.round(18 + (charCount / 10) * 3)));
+          
           track.style.setProperty('--marquee-duration', dynamicDuration + 's');
-        }
+
+          setTimeout(() => {
+            isUpdatingMarquee = false;
+          }, 100);
+        });
+      } else {
+        isUpdatingMarquee = false;
       }
     }
 
@@ -419,7 +431,7 @@
             const fetchedMarquee = String(data.marquee).trim();
             if (fetchedMarquee !== "" && fetchedMarquee !== currentDisplayedMarquee) {
               if (currentDisplayedMarquee === "") {
-                renderMarqueeContent(fetchedMarquee);
+                safelyUpdateMarquee(fetchedMarquee);
               } else {
                 pendingMarqueeText = fetchedMarquee;
               }
