@@ -42,6 +42,12 @@
       background-image: radial-gradient(#000000 2px, transparent 2.5px);
       background-size: 30px 30px;
     }
+    
+    /* 防偷看遮罩條紋背景 */
+    .mask-pattern {
+      background-color: #000000;
+      background-image: repeating-linear-gradient(45deg, #FFD93D 0, #FFD93D 15px, #000000 0, #000000 30px);
+    }
   </style>
 </head>
 <body class="text-neo-black font-sans min-h-screen flex flex-col justify-between p-6 select-none selection:bg-neo-yellow">
@@ -56,7 +62,7 @@
     <div class="flex items-center gap-3">
       <div class="bg-white border-4 border-neo-black px-4 py-2 shadow-neo-sm font-black text-sm flex items-center gap-2">
         <span class="w-3 h-3 bg-emerald-500 rounded-full border-2 border-neo-black animate-ping"></span>
-        QR 碼倒數：<span id="refresh-timer" class="font-mono text-neo-red text-base">03:00</span>
+        QR 碼更新：<span id="refresh-timer" class="font-mono text-neo-red text-base">03:00</span>
       </div>
     </div>
   </header>
@@ -70,24 +76,22 @@
 
       <div class="pt-4 space-y-1">
         <h1 id="booth-title" class="text-3xl font-black uppercase tracking-tight">載入中...</h1>
-        <p class="text-sm font-bold text-slate-600">提示：點擊下方黃色區域即可顯示 QR Code</p>
+        <p class="text-sm font-bold text-slate-600">請掃描下方動態 QR Code 領取印章</p>
       </div>
 
-      <!-- QR Code 容器與安全遮罩區塊 -->
+      <!-- QR Code 容器與安全遮罩 -->
       <div class="flex justify-center my-6">
-        <div class="p-4 bg-neo-yellow border-8 border-neo-black shadow-neo-lg inline-block relative overflow-hidden group">
+        <div class="p-4 bg-neo-yellow border-8 border-neo-black shadow-neo-lg inline-block relative overflow-hidden">
           
-          <!-- QR Code 圖像 -->
+          <!-- 二維碼 -->
           <div id="qrcode" class="bg-white p-4 border-4 border-neo-black"></div>
 
-          <!-- 安全防防偷窺遮罩層 (Mask Overlay) -->
-          <div id="qr-mask" onclick="revealQRCode()" class="absolute inset-0 bg-neo-black border-4 border-neo-black flex flex-col items-center justify-center p-4 cursor-pointer transition-opacity duration-200 z-20">
-            <div class="text-5xl mb-2 animate-bounce">🔒</div>
-            <div class="bg-neo-yellow text-neo-black font-black text-lg px-4 py-2 border-4 border-neo-black shadow-neo-sm uppercase rotate-1">
-              點擊解鎖顯示 QR 碼
-            </div>
-            <div class="text-white font-bold text-xs mt-3 opacity-80">
-              (顯示 5 秒後將自動重新安全鎖定)
+          <!-- 防偷拍覆蓋遮罩 (點擊或按住揭開) -->
+          <div id="qr-mask" onclick="revealCodeTemporarily()" class="absolute inset-0 mask-pattern flex flex-col items-center justify-center p-4 cursor-pointer transition-opacity duration-200 z-20">
+            <div class="bg-white border-4 border-neo-black p-4 shadow-neo-md text-center rotate-1 hover:scale-105 transition-transform">
+              <span class="text-3xl">🔒</span>
+              <div class="font-black text-lg uppercase mt-1">點擊螢幕顯示蓋印碼</div>
+              <div class="text-xs font-bold text-slate-600 mt-0.5">防遠端偷掃保護中</div>
             </div>
           </div>
 
@@ -95,19 +99,28 @@
       </div>
 
       <div class="bg-neo-bg border-4 border-neo-black p-4 text-xs font-bold space-y-1 text-slate-700">
-        <p>⚡ 已啟用防偷拍防禦遮罩：點擊後僅臨時顯示 5 秒</p>
         <p>⚡ 本 QR Code 與印章動態碼每 3 分鐘自動更新，防範截圖轉傳</p>
+        <p>⚡ 點擊遮罩後將公開 5 秒，隨後自動恢復鎖定保護</p>
       </div>
 
     </div>
   </main>
 
   <footer class="max-w-4xl mx-auto w-full flex justify-between items-end">
-    <div class="bg-neo-violet border-4 border-neo-black p-4 shadow-neo-lg rotate-2 max-w-xs">
+    <!-- 印章動態碼區域 (亦受遮罩保護) -->
+    <div class="bg-neo-violet border-4 border-neo-black p-4 shadow-neo-lg rotate-2 max-w-xs relative overflow-hidden">
       <div class="font-black text-xs uppercase tracking-wider text-slate-800">相機無法開啟？印章動態碼：</div>
-      <div id="rescue-code" class="text-4xl font-black font-mono tracking-widest text-neo-black bg-white border-2 border-neo-black px-3 py-1 my-1 text-center">
-        ----
+      
+      <div class="relative my-1">
+        <div id="rescue-code" class="text-4xl font-black font-mono tracking-widest text-neo-black bg-white border-2 border-neo-black px-3 py-1 text-center">
+          ----
+        </div>
+        <!-- 動態碼獨立小型遮罩 -->
+        <div id="pin-mask" onclick="revealCodeTemporarily()" class="absolute inset-0 bg-neo-black text-neo-yellow border-2 border-neo-black font-black text-sm flex items-center justify-center cursor-pointer">
+          🔒 點擊解鎖動態碼
+        </div>
       </div>
+
       <div class="text-[10px] font-black text-slate-600">訪客可在手機「印章動態碼」輸入上方 4 位數字</div>
     </div>
 
@@ -124,7 +137,7 @@
     let countdownSeconds = 180;
     let boothMap = {};
     let totalBooths = 19;
-    let maskTimeout = null;
+    let revealTimer = null;
 
     document.addEventListener('DOMContentLoaded', () => {
       initBoothSelect();
@@ -133,20 +146,21 @@
       startTimers();
     });
 
-    // 點擊解鎖遮罩並啟動 5 秒自動重新鎖定計時器
-    function revealQRCode() {
-      const mask = document.getElementById('qr-mask');
-      mask.classList.add('opacity-0', 'pointer-events-none');
+    // 點擊解鎖防偷掃遮罩 5 秒
+    function revealCodeTemporarily() {
+      const qrMask = document.getElementById('qr-mask');
+      const pinMask = document.getElementById('pin-mask');
 
-      if (maskTimeout) clearTimeout(maskTimeout);
-      maskTimeout = setTimeout(() => {
-        hideQRCode();
-      }, 5000); // 5 秒後自動覆蓋遮罩
-    }
+      qrMask.classList.add('opacity-0', 'pointer-events-none');
+      pinMask.classList.add('opacity-0', 'pointer-events-none');
 
-    function hideQRCode() {
-      const mask = document.getElementById('qr-mask');
-      mask.classList.remove('opacity-0', 'pointer-events-none');
+      if (revealTimer) clearTimeout(revealTimer);
+
+      // 5 秒後自動恢復遮蔽保護
+      revealTimer = setTimeout(() => {
+        qrMask.classList.remove('opacity-0', 'pointer-events-none');
+        pinMask.classList.remove('opacity-0', 'pointer-events-none');
+      }, 5000);
     }
 
     function initBoothSelect() {
@@ -203,7 +217,6 @@
       currentBooth = document.getElementById('booth-select').value;
       updateBoothTitle();
       countdownSeconds = 180;
-      hideQRCode(); // 切換攤位時自動鎖定遮罩
       updateQRCode();
     }
 
