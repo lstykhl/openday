@@ -138,7 +138,7 @@
       </button>
     </section>
 
-    <!-- 格子區 (已更新為每行 3 格：grid-cols-3) -->
+    <!-- 格子區 (已更新為每行 3 格) -->
     <section class="bg-white border-4 border-neo-black p-5 shadow-neo-lg space-y-3">
       <div class="flex justify-between items-center border-b-2 border-neo-black pb-2">
         <h3 class="font-black text-sm uppercase tracking-wider">我的印章卡</h3>
@@ -146,7 +146,6 @@
           🗺️ 檢視地圖
         </button>
       </div>
-      <!-- 此處 class 改為 grid-cols-3 -->
       <div id="booth-grid" class="grid grid-cols-3 gap-2.5 text-center"></div>
     </section>
 
@@ -220,17 +219,17 @@
     </div>
   </div>
 
-  <!-- 彈窗 3：禮物確認 Modal -->
+  <!-- 彈窗 3：動態禮物確認 Modal (支援 4 種階梯) -->
   <div id="redeem-confirm-modal" class="fixed inset-0 bg-neo-black/60 hidden z-50 flex items-center justify-center p-4">
     <div class="bg-white border-4 border-neo-black shadow-neo-xl p-6 w-full max-w-sm space-y-4 text-center">
       <div class="inline-block bg-neo-yellow border-4 border-neo-black p-3 text-2xl font-black rotate-3">⚠️ 警示</div>
-      <h3 class="font-black text-xl uppercase">確定要現在兌換小獎嗎？</h3>
+      <h3 id="redeem-modal-title" class="font-black text-xl uppercase">確定要現在兌換嗎？</h3>
       <p id="redeem-modal-tip" class="text-xs font-bold text-slate-700 leading-relaxed border-2 border-neo-black p-3 bg-neo-bg">
-        ⚠️ 特別注意：兌換「小獎」後，本系統將<span class="text-neo-red font-black">鎖定</span>，無法繼續挑戰大獎！
+        ⚠️ 特別注意：兌換後系統將<span class="text-neo-red font-black">鎖定</span>，無法繼續挑戰更高等級的獎品！
       </p>
       <div class="space-y-2 pt-2">
-        <button onclick="triggerRedeem('Small')" class="w-full py-3 bg-neo-red text-white border-4 border-neo-black font-black text-sm shadow-neo-sm uppercase">確定兌換小獎</button>
-        <button onclick="closeRedeemConfirmModal()" class="w-full py-2.5 bg-neo-yellow border-4 border-neo-black font-black text-sm shadow-neo-sm uppercase">再想想，我去集大獎</button>
+        <button id="btn-redeem-confirm" onclick="confirmRedeem()" class="w-full py-3 bg-neo-red text-white border-4 border-neo-black font-black text-sm shadow-neo-sm uppercase">確定兌換</button>
+        <button id="btn-redeem-cancel" onclick="closeRedeemConfirmModal()" class="w-full py-2.5 bg-neo-yellow border-4 border-neo-black font-black text-sm shadow-neo-sm uppercase">再想想</button>
       </div>
     </div>
   </div>
@@ -271,9 +270,12 @@
   <script>
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzA4Iuflm5N6faXsrUXPQ8Q68VNfcDysS_3ru281wLymPPxzt92fliq2k7Of0pIdCBcHw/exec";
     
+    // 動態變數（支援 4 個階梯）
     let TOTAL_BOOTHS = 19;
-    let MIN_STAMPS_SMALL = 10;
-    let MIN_STAMPS_BIG = 15;
+    let MIN_STAMPS_SMALL = 1;
+    let MIN_STAMPS_MEDIUM = 11;
+    let MIN_STAMPS_BIG = 16;
+    let MIN_STAMPS_GRAND = 19;
 
     let guestId = localStorage.getItem('guest_id');
     if (!guestId) {
@@ -287,6 +289,7 @@
     let foodRedeemed = localStorage.getItem('food_redeemed') === 'true';
     let boothNames = {};
     let timerInterval = null;
+    let currentRedeemType = null; // 用來記錄準備兌換哪一種獎
 
     let pendingMarqueeText = null;
 
@@ -359,10 +362,13 @@
       fetch(GAS_API_URL)
         .then(res => res.json())
         .then(data => {
+          // 動態同步 4 個階梯門檻與數量
           if (data && data.config) {
             TOTAL_BOOTHS = data.config.totalBooths || TOTAL_BOOTHS;
             MIN_STAMPS_SMALL = data.config.minStampsSmall || MIN_STAMPS_SMALL;
+            MIN_STAMPS_MEDIUM = data.config.minStampsMedium || MIN_STAMPS_MEDIUM;
             MIN_STAMPS_BIG = data.config.minStampsBig || MIN_STAMPS_BIG;
+            MIN_STAMPS_GRAND = data.config.minStampsGrand || MIN_STAMPS_GRAND;
           }
           if (data && data.marquee) {
             const currentText = document.querySelector('.marquee-content').innerText.replace(/^⚡\s*|\s*⚡$/g, '');
@@ -429,6 +435,7 @@
       });
     }
 
+    // 核心邏輯：判斷 4 種階梯進度
     function updateProgress() {
       const count = userStamps.length;
       document.getElementById('stamp-count').innerText = count + ' / ' + TOTAL_BOOTHS;
@@ -439,24 +446,75 @@
       if (redemptionStatus !== 'None') {
         btn.disabled = true;
         btn.className = "w-full py-4 bg-slate-200 text-slate-500 font-black border-4 border-neo-black shadow-neo-sm uppercase";
-        btn.innerText = "🔒 已成功兌換 (" + (redemptionStatus === 'Small' ? '小獎' : '大獎') + ")";
-      } else if (count >= MIN_STAMPS_BIG) {
+        
+        let prizeName = '禮物';
+        if(redemptionStatus === 'Small') prizeName = '細獎';
+        if(redemptionStatus === 'Medium') prizeName = '中獎';
+        if(redemptionStatus === 'Big') prizeName = '大獎';
+        if(redemptionStatus === 'Grand') prizeName = '特大獎';
+        
+        btn.innerText = "🔒 已成功兌換 (" + prizeName + ")";
+      } 
+      else if (count >= MIN_STAMPS_GRAND) {
         btn.disabled = false;
         btn.className = "w-full py-4 bg-neo-red text-white font-black border-4 border-neo-black shadow-neo-md active:translate-x-[2px] active:translate-y-[2px] active:shadow-none uppercase tracking-wide cursor-pointer";
-        btn.innerText = "🎁 兌換大獎 (" + MIN_STAMPS_BIG + " 印章卡解鎖)";
-        btn.onclick = () => triggerRedeem('Big');
-      } else if (count >= MIN_STAMPS_SMALL) {
+        btn.innerText = "🏆 兌換特大獎 (最高成就！)";
+        btn.onclick = () => openRedeemModal('Grand');
+      } 
+      else if (count >= MIN_STAMPS_BIG) {
+        btn.disabled = false;
+        btn.className = "w-full py-4 bg-orange-400 text-white font-black border-4 border-neo-black shadow-neo-md active:translate-x-[2px] active:translate-y-[2px] active:shadow-none uppercase tracking-wide cursor-pointer";
+        btn.innerText = "🎁 兌換大獎 (或繼續集特大獎)";
+        btn.onclick = () => openRedeemModal('Big');
+      } 
+      else if (count >= MIN_STAMPS_MEDIUM) {
         btn.disabled = false;
         btn.className = "w-full py-4 bg-neo-yellow text-neo-black font-black border-4 border-neo-black shadow-neo-md active:translate-x-[2px] active:translate-y-[2px] active:shadow-none uppercase tracking-wide cursor-pointer";
-        btn.innerText = "🎁 兌換小獎 (或繼續集大獎)";
-        btn.onclick = () => {
-          document.getElementById('redeem-modal-tip').innerHTML = '⚠️ 特別注意：兌換「小獎」後，本系統將<span class="text-neo-red font-black">鎖定</span>，無法繼續挑戰 ' + MIN_STAMPS_BIG + ' 個印章的大獎！';
-          document.getElementById('redeem-confirm-modal').classList.remove('hidden');
-        };
-      } else {
+        btn.innerText = "🎁 兌換中獎 (或繼續集大獎)";
+        btn.onclick = () => openRedeemModal('Medium');
+      } 
+      else if (count >= MIN_STAMPS_SMALL) {
+        btn.disabled = false;
+        btn.className = "w-full py-4 bg-emerald-400 text-neo-black font-black border-4 border-neo-black shadow-neo-md active:translate-x-[2px] active:translate-y-[2px] active:shadow-none uppercase tracking-wide cursor-pointer";
+        btn.innerText = "🎁 兌換細獎 (或繼續集中獎)";
+        btn.onclick = () => openRedeemModal('Small');
+      } 
+      else {
         btn.disabled = true;
         btn.className = "w-full py-4 bg-slate-200 text-slate-400 font-black border-4 border-neo-black shadow-neo-sm uppercase cursor-not-allowed";
-        btn.innerText = "🔒 未達門檻 (還差 " + (MIN_STAMPS_SMALL - count) + " 個換小獎)";
+        btn.innerText = "🔒 未達門檻 (還差 " + (MIN_STAMPS_SMALL - count) + " 個換細獎)";
+      }
+    }
+
+    // 開啟動態禮物確認彈窗
+    function openRedeemModal(type) {
+      currentRedeemType = type;
+      let prizeName = '';
+      let nextTarget = '';
+      
+      if (type === 'Small') { prizeName = '細獎'; nextTarget = '中獎'; }
+      else if (type === 'Medium') { prizeName = '中獎'; nextTarget = '大獎'; }
+      else if (type === 'Big') { prizeName = '大獎'; nextTarget = '特大獎'; }
+      else if (type === 'Grand') { prizeName = '特大獎'; nextTarget = ''; }
+
+      document.getElementById('redeem-modal-title').innerText = `確定要現在兌換${prizeName}嗎？`;
+      
+      if (type === 'Grand') {
+        document.getElementById('redeem-modal-tip').innerHTML = `恭喜集齊最高等級！兌換後系統將鎖定。`;
+        document.getElementById('btn-redeem-confirm').innerText = `確定兌換${prizeName}`;
+        document.getElementById('btn-redeem-cancel').innerText = `稍後再兌`;
+      } else {
+        document.getElementById('redeem-modal-tip').innerHTML = `⚠️ 特別注意：兌換「${prizeName}」後，本系統將<span class="text-neo-red font-black">鎖定</span>，無法繼續挑戰更高等級的獎品！`;
+        document.getElementById('btn-redeem-confirm').innerText = `確定兌換${prizeName}`;
+        document.getElementById('btn-redeem-cancel').innerText = `再想想，我去集${nextTarget}`;
+      }
+      
+      document.getElementById('redeem-confirm-modal').classList.remove('hidden');
+    }
+
+    function confirmRedeem() {
+      if(currentRedeemType) {
+        triggerRedeem(currentRedeemType);
       }
     }
 
@@ -591,6 +649,7 @@
       }
     }
 
+    // 觸發兌換並顯示對應獎品名稱的閃爍憑證
     function triggerRedeem(type) {
       closeRedeemConfirmModal();
       redemptionStatus = type;
@@ -598,7 +657,13 @@
       updateProgress();
       syncToBackend();
 
-      startVerificationScreen(type === 'Big' ? '已成功兌換大獎' : '已成功兌換小獎');
+      let title = '已成功兌換禮物';
+      if(type === 'Small') title = '已成功兌換細獎';
+      if(type === 'Medium') title = '已成功兌換中獎';
+      if(type === 'Big') title = '已成功兌換大獎';
+      if(type === 'Grand') title = '已成功兌換特大獎';
+
+      startVerificationScreen(title);
     }
 
     function openFoodConfirmModal() { document.getElementById('food-confirm-modal').classList.remove('hidden'); }
@@ -631,7 +696,7 @@
       }, 1000);
     }
 
-    function closeRedeemConfirmModal() { document.getElementById('redeem-confirm-modal').classList.remove('hidden'); }
+    function closeRedeemConfirmModal() { document.getElementById('redeem-confirm-modal').classList.add('hidden'); }
     function closeVerificationScreen() {
       if (timerInterval) clearInterval(timerInterval);
       document.getElementById('verification-screen').classList.add('hidden');
