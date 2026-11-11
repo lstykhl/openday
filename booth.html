@@ -49,7 +49,8 @@
   <header class="flex justify-between items-center max-w-4xl mx-auto w-full">
     <div class="flex items-center gap-3">
       <span class="font-black text-sm uppercase bg-neo-black text-white px-3 py-1.5 border-2 border-neo-black shadow-neo-sm">選擇攤位</span>
-      <select id="booth-select" onchange="changeBooth()" class="font-black text-xl bg-neo-yellow border-4 border-neo-black p-2 shadow-neo-sm focus:outline-none cursor-pointer">
+      <!-- 包含名稱的動態下拉選單 -->
+      <select id="booth-select" onchange="changeBooth()" class="font-black text-lg bg-neo-yellow border-4 border-neo-black p-2 shadow-neo-sm focus:outline-none cursor-pointer max-w-md truncate">
       </select>
     </div>
 
@@ -69,7 +70,7 @@
       </div>
 
       <div class="pt-4 space-y-1">
-        <h1 id="booth-title" class="text-4xl font-black uppercase tracking-tight">攤位 B01</h1>
+        <h1 id="booth-title" class="text-3xl font-black uppercase tracking-tight">載入中...</h1>
         <p class="text-sm font-bold text-slate-600">請將手機鏡頭對準下方動態 QR Code</p>
       </div>
 
@@ -108,7 +109,7 @@
     let qrcodeInstance = null;
     let countdownSeconds = 180;
     let boothMap = {};
-    let totalBooths = 19; // 預設值
+    let totalBooths = 19;
 
     document.addEventListener('DOMContentLoaded', () => {
       initBoothSelect();
@@ -117,16 +118,23 @@
       startTimers();
     });
 
+    // 動態初始化下拉選單（包含編號與名稱）
     function initBoothSelect() {
       const select = document.getElementById('booth-select');
+      const savedValue = select.value || currentBooth;
       select.innerHTML = '';
+      
       for (let i = 1; i <= totalBooths; i++) {
         const id = 'B' + i.toString().padStart(2, '0');
+        const name = boothMap[id] ? ` (${boothMap[id]})` : '';
         const option = document.createElement('option');
         option.value = id;
-        option.innerText = '地點 ' + id;
+        option.innerText = `${id}${name}`;
         select.appendChild(option);
       }
+      
+      select.value = savedValue;
+      updateBoothTitle();
     }
 
     function fetchBackendData() {
@@ -134,15 +142,20 @@
       fetch(GAS_API_URL)
         .then(res => res.json())
         .then(data => {
+          let updated = false;
           if (data && data.config && data.config.totalBooths) {
             if (totalBooths !== data.config.totalBooths) {
               totalBooths = data.config.totalBooths;
-              initBoothSelect(); // 數量有變時重新生成下拉選單
+              updated = true;
             }
           }
           if (data && data.booths) {
             boothMap = data.booths;
-            updateBoothTitle();
+            updated = true;
+          }
+          // 當成功取得後端資料後，刷新下拉選單
+          if (updated) {
+            initBoothSelect();
           }
         }).catch(err => console.warn("Fetch backend error:", err));
     }
@@ -151,9 +164,9 @@
       const name = boothMap[currentBooth] || '';
       const titleElem = document.getElementById('booth-title');
       if (name) {
-        titleElem.innerText = currentBooth + ' ' + name;
+        titleElem.innerText = `${currentBooth} ${name}`;
       } else {
-        titleElem.innerText = '攤位 ' + currentBooth;
+        titleElem.innerText = `攤位 ${currentBooth}`;
       }
     }
 
