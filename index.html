@@ -74,10 +74,10 @@
   <div class="sticky top-0 z-40 bg-neo-yellow border-b-4 border-neo-black py-2.5 overflow-hidden shadow-neo-sm">
     <div id="marquee-track" class="marquee-container">
       <div class="marquee-content font-black text-sm tracking-wide uppercase">
-        ⚡ 歡迎光臨學校開放日 2026！集齊 10 個印章換小獎，15 個挑戰大獎！ ⚡
+        ⚡ 歡迎光臨學校開放日 2026！集章贏取豐富獎品！ ⚡
       </div>
       <div class="marquee-content font-black text-sm tracking-wide uppercase" aria-hidden="true">
-        ⚡ 歡迎光臨學校開放日 2026！集齊 10 個印章換小獎，15 個挑戰大獎！ ⚡
+        ⚡ 歡迎光臨學校開放日 2026！集章贏取豐富獎品！ ⚡
       </div>
     </div>
   </div>
@@ -109,7 +109,7 @@
       <div class="flex justify-between items-center border-b-4 border-neo-black pb-3">
         <h2 class="font-black text-xl uppercase tracking-wide">已收集印章：</h2>
         <span id="stamp-count" class="font-black text-base bg-neo-yellow border-2 border-neo-black px-3 py-1 shadow-neo-sm">
-          0 / 17
+          0 / 19
         </span>
       </div>
 
@@ -118,12 +118,10 @@
       </div>
 
       <div id="reward-action-area" class="pt-2 space-y-2">
-        <!-- 兌換禮物按鈕 -->
         <button id="btn-redeem" class="w-full py-4 bg-slate-200 text-slate-400 font-black border-4 border-neo-black shadow-neo-sm uppercase tracking-wide cursor-not-allowed" disabled>
-          🔒 未達門檻 (需至少 10 印章)
+          🔒 未達門檻
         </button>
 
-        <!-- 換小食一份按鈕 -->
         <button id="btn-redeem-food" onclick="openFoodConfirmModal()" class="w-full py-3 bg-neo-violet hover:bg-violet-300 text-neo-black font-black border-4 border-neo-black shadow-neo-md active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all uppercase tracking-wide cursor-pointer flex items-center justify-center gap-2">
           🍿 換小食一份 (點擊兌換)
         </button>
@@ -140,16 +138,18 @@
       </button>
     </section>
 
-    <!-- 17 地點格子區 -->
+    <!-- 格子區 (標頭增加開啟地圖功能) -->
     <section class="bg-white border-4 border-neo-black p-5 shadow-neo-lg space-y-3">
       <div class="flex justify-between items-center border-b-2 border-neo-black pb-2">
         <h3 class="font-black text-sm uppercase tracking-wider">我的印章卡</h3>
-        <span class="text-xs font-bold bg-neo-violet border border-neo-black px-2 py-0.5">檢視地圖</span>
+        <button onclick="openMapModal()" class="text-xs font-black bg-neo-violet hover:bg-violet-300 border-2 border-neo-black px-2.5 py-1 shadow-neo-sm active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all cursor-pointer">
+          🗺️ 檢視地圖
+        </button>
       </div>
       <div id="booth-grid" class="grid grid-cols-4 gap-2 text-center"></div>
     </section>
 
-    <!-- 工作坊與活動即時行程區塊 -->
+    <!-- 工作坊區塊 -->
     <section class="bg-white border-4 border-neo-black p-5 shadow-neo-lg space-y-3">
       <h3 class="font-black text-sm uppercase tracking-wider border-b-2 border-neo-black pb-2">⚡ 工作坊與活動時間表</h3>
       <div id="workshop-list" class="space-y-2.5">
@@ -164,7 +164,20 @@
 
   </main>
 
-  <!-- 彈窗 0：首次選擇身份 Modal -->
+  <!-- 彈窗：檢視地圖 Modal -->
+  <div id="map-modal" class="fixed inset-0 bg-neo-black/80 hidden z-50 flex items-center justify-center p-4">
+    <div class="bg-white border-4 border-neo-black shadow-neo-xl p-4 w-full max-w-md space-y-3">
+      <div class="flex justify-between items-center border-b-4 border-neo-black pb-2">
+        <h3 class="font-black text-base uppercase">學校開放日地圖</h3>
+        <button onclick="closeMapModal()" class="font-black text-sm bg-neo-red text-white border-2 border-neo-black px-2 py-0.5">✕ 關閉</button>
+      </div>
+      <div class="border-4 border-neo-black bg-neo-bg overflow-hidden max-h-[70vh] flex items-center justify-center p-1">
+        <img src="map.png" alt="學校地圖" class="w-full h-auto max-h-[65vh] object-contain" />
+      </div>
+    </div>
+  </div>
+
+  <!-- 彈窗 0：身份選擇 Modal -->
   <div id="role-modal" class="fixed inset-0 bg-neo-black/80 hidden z-50 flex items-center justify-center p-4">
     <div class="bg-white border-4 border-neo-black shadow-neo-xl p-6 w-full max-w-sm space-y-4 text-center">
       <h2 class="text-2xl font-black uppercase border-b-4 border-neo-black pb-2">歡迎光臨！請選擇身份</h2>
@@ -193,7 +206,7 @@
     </div>
   </div>
 
-  <!-- 彈窗 2：手動 4 位數印章動態碼 Modal -->
+  <!-- 彈窗 2：手動印章動態碼 Modal -->
   <div id="pin-modal" class="fixed inset-0 bg-neo-black/60 hidden z-50 flex items-center justify-center p-4">
     <div class="bg-white border-4 border-neo-black shadow-neo-xl p-6 w-full max-w-sm space-y-4">
       <h3 class="font-black text-lg text-center uppercase border-b-4 border-neo-black pb-2">輸入 4 位數印章動態碼</h3>
@@ -206,22 +219,22 @@
     </div>
   </div>
 
-  <!-- 彈窗 3：兌換禮物二選一確認 Modal -->
+  <!-- 彈窗 3：禮物確認 Modal -->
   <div id="redeem-confirm-modal" class="fixed inset-0 bg-neo-black/60 hidden z-50 flex items-center justify-center p-4">
     <div class="bg-white border-4 border-neo-black shadow-neo-xl p-6 w-full max-w-sm space-y-4 text-center">
       <div class="inline-block bg-neo-yellow border-4 border-neo-black p-3 text-2xl font-black rotate-3">⚠️ 警示</div>
       <h3 class="font-black text-xl uppercase">確定要現在兌換小獎嗎？</h3>
-      <p class="text-xs font-bold text-slate-700 leading-relaxed border-2 border-neo-black p-3 bg-neo-bg">
-        ⚠️ 特別注意：兌換「小獎」後，本系統將<span class="text-neo-red font-black">鎖定</span>，無法繼續挑戰 15 個印章的大獎！
+      <p id="redeem-modal-tip" class="text-xs font-bold text-slate-700 leading-relaxed border-2 border-neo-black p-3 bg-neo-bg">
+        ⚠️ 特別注意：兌換「小獎」後，本系統將<span class="text-neo-red font-black">鎖定</span>，無法繼續挑戰大獎！
       </p>
       <div class="space-y-2 pt-2">
         <button onclick="triggerRedeem('Small')" class="w-full py-3 bg-neo-red text-white border-4 border-neo-black font-black text-sm shadow-neo-sm uppercase">確定兌換小獎</button>
-        <button onclick="closeRedeemConfirmModal()" class="w-full py-2.5 bg-neo-yellow border-4 border-neo-black font-black text-sm shadow-neo-sm uppercase">再想想，我去集 15 個大獎</button>
+        <button onclick="closeRedeemConfirmModal()" class="w-full py-2.5 bg-neo-yellow border-4 border-neo-black font-black text-sm shadow-neo-sm uppercase">再想想，我去集大獎</button>
       </div>
     </div>
   </div>
 
-  <!-- 彈窗 4：兌換小食確認 Modal -->
+  <!-- 彈窗 4：小食確認 Modal -->
   <div id="food-confirm-modal" class="fixed inset-0 bg-neo-black/60 hidden z-50 flex items-center justify-center p-4">
     <div class="bg-white border-4 border-neo-black shadow-neo-xl p-6 w-full max-w-sm space-y-4 text-center">
       <div class="inline-block bg-neo-violet border-4 border-neo-black p-3 text-2xl font-black rotate-2">🍿 兌換小食</div>
@@ -236,7 +249,7 @@
     </div>
   </div>
 
-  <!-- 全螢幕動態驗證頁面 (禮物 & 小食通用) -->
+  <!-- 全螢幕動態驗證頁面 -->
   <div id="verification-screen" class="fixed inset-0 animate-neo-flash hidden z-50 flex flex-col items-center justify-between p-6 text-center text-neo-black">
     <div class="space-y-2 pt-6">
       <span class="bg-white border-4 border-neo-black font-black text-xs px-4 py-1.5 shadow-neo-md uppercase tracking-widest">學校開放日 2026 官方憑證</span>
@@ -256,7 +269,11 @@
 
   <script>
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzA4Iuflm5N6faXsrUXPQ8Q68VNfcDysS_3ru281wLymPPxzt92fliq2k7Of0pIdCBcHw/exec";
-    const TOTAL_BOOTHS = 17;
+    
+    // 動態變數（預設值，將由 GAS 後端動態覆蓋）
+    let TOTAL_BOOTHS = 19;
+    let MIN_STAMPS_SMALL = 10;
+    let MIN_STAMPS_BIG = 15;
 
     let guestId = localStorage.getItem('guest_id');
     if (!guestId) {
@@ -287,6 +304,9 @@
       fetchDataFromBackend();
       setInterval(fetchDataFromBackend, 60000);
     });
+
+    function openMapModal() { document.getElementById('map-modal').classList.remove('hidden'); }
+    function closeMapModal() { document.getElementById('map-modal').classList.add('hidden'); }
 
     function initMarqueeSync() {
       const track = document.getElementById('marquee-track');
@@ -339,6 +359,12 @@
       fetch(GAS_API_URL)
         .then(res => res.json())
         .then(data => {
+          // 動態同步 Config 門檻與數量
+          if (data && data.config) {
+            TOTAL_BOOTHS = data.config.totalBooths || TOTAL_BOOTHS;
+            MIN_STAMPS_SMALL = data.config.minStampsSmall || MIN_STAMPS_SMALL;
+            MIN_STAMPS_BIG = data.config.minStampsBig || MIN_STAMPS_BIG;
+          }
           if (data && data.marquee) {
             const currentText = document.querySelector('.marquee-content').innerText.replace(/^⚡\s*|\s*⚡$/g, '');
             if (data.marquee !== currentText) {
@@ -347,15 +373,17 @@
           }
           if (data && data.booths) {
             boothNames = data.booths;
-            renderBoothGrid();
           }
+          
+          renderBoothGrid();
+          updateProgress();
+
           if (data && data.workshops && data.workshops.length > 0) {
             renderWorkshops(data.workshops);
           }
         }).catch(err => console.warn("Fetch error:", err));
     }
 
-    // 重構：攤位卡片完整顯示名稱，並將星星改為背景浮水印
     function renderBoothGrid() {
       const grid = document.getElementById('booth-grid');
       grid.innerHTML = '';
@@ -405,7 +433,7 @@
     function updateProgress() {
       const count = userStamps.length;
       document.getElementById('stamp-count').innerText = count + ' / ' + TOTAL_BOOTHS;
-      document.getElementById('progress-bar').style.width = ((count / TOTAL_BOOTHS) * 100) + '%';
+      document.getElementById('progress-bar').style.width = Math.min(100, ((count / TOTAL_BOOTHS) * 100)) + '%';
 
       const btn = document.getElementById('btn-redeem');
 
@@ -413,20 +441,23 @@
         btn.disabled = true;
         btn.className = "w-full py-4 bg-slate-200 text-slate-500 font-black border-4 border-neo-black shadow-neo-sm uppercase";
         btn.innerText = "🔒 已成功兌換 (" + (redemptionStatus === 'Small' ? '小獎' : '大獎') + ")";
-      } else if (count >= 15) {
+      } else if (count >= MIN_STAMPS_BIG) {
         btn.disabled = false;
         btn.className = "w-full py-4 bg-neo-red text-white font-black border-4 border-neo-black shadow-neo-md active:translate-x-[2px] active:translate-y-[2px] active:shadow-none uppercase tracking-wide cursor-pointer";
-        btn.innerText = "🎁 兌換大獎 (15 印章卡解鎖)";
+        btn.innerText = "🎁 兌換大獎 (" + MIN_STAMPS_BIG + " 印章卡解鎖)";
         btn.onclick = () => triggerRedeem('Big');
-      } else if (count >= 10) {
+      } else if (count >= MIN_STAMPS_SMALL) {
         btn.disabled = false;
         btn.className = "w-full py-4 bg-neo-yellow text-neo-black font-black border-4 border-neo-black shadow-neo-md active:translate-x-[2px] active:translate-y-[2px] active:shadow-none uppercase tracking-wide cursor-pointer";
         btn.innerText = "🎁 兌換小獎 (或繼續集大獎)";
-        btn.onclick = () => document.getElementById('redeem-confirm-modal').classList.remove('hidden');
+        btn.onclick = () => {
+          document.getElementById('redeem-modal-tip').innerHTML = '⚠️ 特別注意：兌換「小獎」後，本系統將<span class="text-neo-red font-black">鎖定</span>，無法繼續挑戰 ' + MIN_STAMPS_BIG + ' 個印章的大獎！';
+          document.getElementById('redeem-confirm-modal').classList.remove('hidden');
+        };
       } else {
         btn.disabled = true;
         btn.className = "w-full py-4 bg-slate-200 text-slate-400 font-black border-4 border-neo-black shadow-neo-sm uppercase cursor-not-allowed";
-        btn.innerText = "🔒 未達門檻 (還差 " + (10 - count) + " 個換小獎)";
+        btn.innerText = "🔒 未達門檻 (還差 " + (MIN_STAMPS_SMALL - count) + " 個換小獎)";
       }
     }
 
