@@ -108,10 +108,11 @@
     let qrcodeInstance = null;
     let countdownSeconds = 180;
     let boothMap = {};
+    let totalBooths = 19; // 預設值
 
     document.addEventListener('DOMContentLoaded', () => {
       initBoothSelect();
-      fetchBoothNames();
+      fetchBackendData();
       updateQRCode();
       startTimers();
     });
@@ -119,7 +120,7 @@
     function initBoothSelect() {
       const select = document.getElementById('booth-select');
       select.innerHTML = '';
-      for (let i = 1; i <= 17; i++) {
+      for (let i = 1; i <= totalBooths; i++) {
         const id = 'B' + i.toString().padStart(2, '0');
         const option = document.createElement('option');
         option.value = id;
@@ -128,16 +129,22 @@
       }
     }
 
-    function fetchBoothNames() {
+    function fetchBackendData() {
       if (!GAS_API_URL || GAS_API_URL.includes("YOUR_GOOGLE_APPS_SCRIPT")) return;
       fetch(GAS_API_URL)
         .then(res => res.json())
         .then(data => {
+          if (data && data.config && data.config.totalBooths) {
+            if (totalBooths !== data.config.totalBooths) {
+              totalBooths = data.config.totalBooths;
+              initBoothSelect(); // 數量有變時重新生成下拉選單
+            }
+          }
           if (data && data.booths) {
             boothMap = data.booths;
             updateBoothTitle();
           }
-        }).catch(err => console.warn("Fetch booth error:", err));
+        }).catch(err => console.warn("Fetch backend error:", err));
     }
 
     function updateBoothTitle() {
@@ -157,7 +164,6 @@
       updateQRCode();
     }
 
-    // 隨機 Hash 演算法生成 4 位數 Pin 碼
     function generateDynamicPin(boothNum, timeBlock) {
       const SALT = 20261013;
       let hash = (boothNum * 9301 + timeBlock * 49297 + SALT) % 233280;
