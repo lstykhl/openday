@@ -45,8 +45,10 @@
       display: flex;
       width: max-content;
       will-change: transform;
+      backface-visibility: hidden;
+      perspective: 1000px;
       transform: translateZ(0);
-      animation: marquee-smooth 25s linear infinite;
+      animation: marquee-smooth var(--marquee-duration, 25s) linear infinite;
     }
 
     .marquee-content {
@@ -73,11 +75,11 @@
   <!-- 置頂無縫跑馬燈 -->
   <div class="sticky top-0 z-40 bg-neo-yellow border-b-4 border-neo-black py-2.5 overflow-hidden shadow-neo-sm">
     <div id="marquee-track" class="marquee-container">
-      <div class="marquee-content font-black text-sm tracking-wide uppercase">
-        ⚡ 歡迎光臨學校開放日 2026！集齊印章自由選換 4 大獎品！ ⚡
+      <div id="marquee-part-1" class="marquee-content font-black text-sm tracking-wide uppercase">
+        ⚡ 歡迎光臨學校開放日 2026！集齊印章自由選換 4 大獎品！
       </div>
-      <div class="marquee-content font-black text-sm tracking-wide uppercase" aria-hidden="true">
-        ⚡ 歡迎光臨學校開放日 2026！集齊印章自由選換 4 大獎品！ ⚡
+      <div id="marquee-part-2" class="marquee-content font-black text-sm tracking-wide uppercase" aria-hidden="true">
+        ⚡ 歡迎光臨學校開放日 2026！集齊印章自由選換 4 大獎品！
       </div>
     </div>
   </div>
@@ -150,7 +152,7 @@
       </button>
     </section>
 
-    <!-- 格子區 -->
+    <!-- 格子區 (每行 3 格) -->
     <section class="bg-white border-4 border-neo-black p-5 shadow-neo-lg space-y-3">
       <div class="flex justify-between items-center border-b-2 border-neo-black pb-2">
         <h3 class="font-black text-sm uppercase tracking-wider">我的印章卡</h3>
@@ -282,14 +284,12 @@
   <script>
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzA4Iuflm5N6faXsrUXPQ8Q68VNfcDysS_3ru281wLymPPxzt92fliq2k7Of0pIdCBcHw/exec";
     
-    // 預設階梯設定
     let TOTAL_BOOTHS = 19;
     let MIN_STAMPS_SMALL = 1;
     let MIN_STAMPS_MEDIUM = 11;
     let MIN_STAMPS_BIG = 16;
     let MIN_STAMPS_GRAND = 19;
 
-    // 用戶資料與陣列化歷史紀錄
     let guestId = localStorage.getItem('guest_id');
     if (!guestId) {
       guestId = 'visitor_' + Math.random().toString(36).substr(2, 9);
@@ -302,7 +302,6 @@
     let timerInterval = null;
     let currentRedeemType = null;
 
-    // 向下相容處理：把舊版的單一字串轉成陣列
     let redemptionHistory = JSON.parse(localStorage.getItem('redemption_history')) || [];
     let oldStatus = localStorage.getItem('redemption_status');
     if (oldStatus && oldStatus !== 'None' && redemptionHistory.length === 0) {
@@ -311,7 +310,6 @@
         localStorage.removeItem('redemption_status');
     }
 
-    // 🔥 跑馬燈同步專用變數
     let currentDisplayedMarquee = "";
     let pendingMarqueeText = null;
 
@@ -333,25 +331,48 @@
     function openMapModal() { document.getElementById('map-modal').classList.remove('hidden'); }
     function closeMapModal() { document.getElementById('map-modal').classList.add('hidden'); }
 
-    // 🔥 修復後的跑馬燈事件監聽與更新邏輯
     function initMarqueeSync() {
       const track = document.getElementById('marquee-track');
       if (!track) return;
 
       track.addEventListener('animationiteration', () => {
         if (pendingMarqueeText !== null) {
-          updateMarqueeDOM(pendingMarqueeText);
+          renderMarqueeContent(pendingMarqueeText);
+          pendingMarqueeText = null;
+        }
+      });
+
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && pendingMarqueeText !== null) {
+          renderMarqueeContent(pendingMarqueeText);
           pendingMarqueeText = null;
         }
       });
     }
 
-    function updateMarqueeDOM(text) {
-      currentDisplayedMarquee = text;
-      const elements = document.querySelectorAll('.marquee-content');
-      elements.forEach(el => {
-        el.innerText = "⚡ " + text + " ⚡";
-      });
+    function renderMarqueeContent(text) {
+      if (!text || typeof text !== 'string') return;
+      const cleanText = text.trim();
+      if (cleanText === "" || cleanText === currentDisplayedMarquee) return;
+
+      currentDisplayedMarquee = cleanText;
+      const formattedText = cleanText.startsWith("⚡") ? cleanText : "⚡ " + cleanText;
+
+      const part1 = document.getElementById('marquee-part-1');
+      const part2 = document.getElementById('marquee-part-2');
+      const track = document.getElementById('marquee-track');
+      
+      if (part1 && part2) {
+        part1.innerText = formattedText;
+        part2.innerText = formattedText;
+
+        const charCount = formattedText.length;
+        const dynamicDuration = Math.min(50, Math.max(15, Math.round(15 + (charCount / 10) * 3)));
+        
+        if (track) {
+          track.style.setProperty('--marquee-duration', dynamicDuration + 's');
+        }
+      }
     }
 
     function selectRole(role) {
@@ -394,12 +415,11 @@
             MIN_STAMPS_GRAND = data.config.minStampsGrand || MIN_STAMPS_GRAND;
           }
 
-          // 🔥 修復走馬燈無縫同步與首次即時寫入邏輯
           if (data && data.marquee) {
             const fetchedMarquee = String(data.marquee).trim();
-            if (fetchedMarquee !== currentDisplayedMarquee) {
+            if (fetchedMarquee !== "" && fetchedMarquee !== currentDisplayedMarquee) {
               if (currentDisplayedMarquee === "") {
-                updateMarqueeDOM(fetchedMarquee);
+                renderMarqueeContent(fetchedMarquee);
               } else {
                 pendingMarqueeText = fetchedMarquee;
               }
