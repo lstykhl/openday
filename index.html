@@ -163,9 +163,14 @@
       <div id="booth-grid" class="grid grid-cols-3 gap-2.5 text-center"></div>
     </section>
 
-    <!-- 工作坊區塊 -->
+    <!-- 工作坊區塊（智慧時間排序 + 預設顯示前 4 項 + 展開/收起） -->
     <section class="bg-white border-4 border-neo-black p-5 shadow-neo-lg space-y-3">
-      <h3 class="font-black text-sm uppercase tracking-wider border-b-2 border-neo-black pb-2">⚡ 工作坊與活動時間表</h3>
+      <div class="flex justify-between items-center border-b-2 border-neo-black pb-2">
+        <h3 class="font-black text-sm uppercase tracking-wider">⚡ 工作坊與活動時間表</h3>
+        <span id="workshop-summary-badge" class="text-[11px] font-black bg-neo-bg border-2 border-neo-black px-2 py-0.5">
+          即時排序
+        </span>
+      </div>
       <div id="workshop-list" class="space-y-2.5">
         <div class="p-3 bg-neo-bg border-2 border-neo-black flex justify-between items-center shadow-neo-sm">
           <div>
@@ -174,6 +179,9 @@
           </div>
         </div>
       </div>
+      <button id="btn-toggle-workshops" onclick="toggleWorkshops()" class="hidden w-full py-2.5 bg-neo-yellow hover:bg-yellow-300 text-neo-black font-black text-xs border-2 border-neo-black shadow-neo-sm active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all uppercase tracking-wider cursor-pointer">
+        ▼ 展開全部活動
+      </button>
     </section>
 
   </main>
@@ -316,6 +324,11 @@
     let isRedeeming = false;
     let syncDebounceTimer = null;
 
+    // 工作坊狀態管理
+    let allWorkshopsData = [];
+    let isWorkshopsExpanded = false;
+    const WORKSHOPS_COLLAPSED_LIMIT = 4;
+
     let redemptionHistory = JSON.parse(localStorage.getItem('redemption_history')) || [];
     let oldStatus = localStorage.getItem('redemption_status');
     if (oldStatus && oldStatus !== 'None' && redemptionHistory.length === 0) {
@@ -328,19 +341,59 @@
     let pendingMarqueeText = null;
     let isUpdatingMarquee = false;
 
-    // 優先載入本地快取的系統設定與攤位名稱，減輕首頁載入依賴
-    function loadCachedSystemData() {
-      try {
-        const cached = JSON.parse(localStorage.getItem('cached_system_data'));
-        if (cached) {
-          applySystemData(cached, true);
-        }
-      } catch (e) {
-        console.warn("Cache read error:", e);
+    document.addEventListener('DOMContentLoaded', () => {
+      if (!userRole) {
+        document.getElementById('role-modal').classList.remove('hidden');
+      } else {
+        updateRoleBadge();
       }
+
+      loadCachedBackendData();
+
+      renderBoothGrid();
+      updateProgress();
+      updateFoodButton();
+      
+      initMarqueeSync();
+      fetchDataFromBackend();
+
+      scheduleNextPoll();
+
+      // 每分鐘自動重新評估工作坊「進行中 / 即將開始 / 已結束」狀態並重新排序
+      setInterval(() => {
+        if (allWorkshopsData.length > 0) {
+          renderWorkshops(allWorkshopsData);
+        }
+      }, 60000);
+
+      window.addEventListener('online', () => {
+        if (localStorage.getItem('needs_sync') === 'true') {
+          syncToBackend(true);
+        }
+      });
+    });
+
+    function scheduleNextPoll() {
+      const jitterMs = 180000 + Math.floor(Math.random() * 30000);
+      setTimeout(() => {
+        if (localStorage.getItem('needs_sync') === 'true') {
+          syncToBackend(true);
+        }
+        fetchDataFromBackend();
+        scheduleNextPoll();
+      }, jitterMs);
     }
 
-    function applySystemData(data, isFromCache = false) {
+    function loadCachedBackendData() {
+      try {
+        const cached = JSON.parse(localStorage.getItem('cached_backend_data'));
+        if (cached) {
+          applyBackendPayload(cached);
+        }
+      } catch (e) {}
+    }
+
+    function applyBackendPayload(data) {
       if (data && data.config) {
         TOTAL_BOOTHS = data.config.totalBooths || TOTAL_BOOTHS;
         MIN_STAMPS_SMALL = data.config.minStampsSmall || MIN_STAMPS_SMALL;
@@ -365,48 +418,11 @@
       renderBoothGrid();
       updateProgress();
 
-      if (data && data.workshops && data.workshops.length > 0) {
-        renderWorkshops(data.workshops);
-      } else if (!isFromCache && data && data.workshops) {
-        renderWorkshops([]);
+      if (data && data.workshops) {
+        allWorkshopsData = data.workshops;
+        renderWorkshops(allWorkshopsData);
       }
     }
-
-    // 帶有隨機抖動 (Jitter) 的 3 分鐘背景輪詢排程，避免 800 人同時整點衝擊後端
-    function scheduleNextBackendFetch() {
-      const baseInterval = 180000; // 3 分鐘
-      const randomJitter = Math.floor(Math.random() * 30000); // 0 ~ 30 秒隨機分散
-      setTimeout(() => {
-        if (localStorage.getItem('needs_sync') === 'true') {
-          syncToBackend(true);
-        }
-        fetchDataFromBackend();
-        scheduleNextBackendFetch();
-      }, baseInterval + randomJitter);
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-      if (!userRole) {
-        document.getElementById('role-modal').classList.remove('hidden');
-      } else {
-        updateRoleBadge();
-      }
-
-      loadCachedSystemData();
-      renderBoothGrid();
-      updateProgress();
-      updateFoodButton();
-      
-      initMarqueeSync();
-      fetchDataFromBackend();
-      scheduleNextBackendFetch();
-
-      window.addEventListener('online', () => {
-        if (localStorage.getItem('needs_sync') === 'true') {
-          syncToBackend(true);
-        }
-      });
-    });
 
     function openMapModal() { document.getElementById('map-modal').classList.remove('hidden'); }
     function closeMapModal() { document.getElementById('map-modal').classList.add('hidden'); }
@@ -470,52 +486,53 @@
       localStorage.setItem('user_role', role);
       document.getElementById('role-modal').classList.add('hidden');
       updateRoleBadge();
-      syncToBackend(true); // 選身份立即同步
+      syncToBackend(false);
     }
 
     function updateRoleBadge() { document.getElementById('user-role-badge').innerText = userRole || '訪客'; }
 
-    // 支援防抖合併寫入（連續掃碼延遲 3 秒合併）與重要操作即時寫入（換獎品/換小食）
     function syncToBackend(immediate = false) {
       localStorage.setItem('needs_sync', 'true');
       if (!GAS_API_URL || GAS_API_URL.includes("YOUR_GOOGLE_APPS_SCRIPT")) return;
+      if (!navigator.onLine) return;
 
       if (syncDebounceTimer) {
         clearTimeout(syncDebounceTimer);
         syncDebounceTimer = null;
       }
 
-      const executePost = () => {
-        if (!navigator.onLine) return;
-        const prizeTypes = redemptionHistory.map(item => typeof item === 'object' ? item.type : item);
+      if (!immediate) {
+        syncDebounceTimer = setTimeout(() => {
+          executeBackendPost();
+        }, 3000);
+      } else {
+        executeBackendPost();
+      }
+    }
 
-        const payload = {
-          guestId: guestId,
-          role: userRole,
-          stamps: userStamps,
-          redeemedPrize: prizeTypes.length > 0 ? prizeTypes.join(', ') : "None",
-          redeemedFood: foodRedeemed
-        };
+    function executeBackendPost() {
+      const prizeTypes = redemptionHistory.map(item => typeof item === 'object' ? item.type : item);
 
-        fetch(GAS_API_URL, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify(payload)
-        })
-        .then(() => {
-          localStorage.removeItem('needs_sync');
-        })
-        .catch(err => {
-          console.warn("Sync error, will retry later:", err);
-        });
+      const payload = {
+        guestId: guestId,
+        role: userRole,
+        stamps: userStamps,
+        redeemedPrize: prizeTypes.length > 0 ? prizeTypes.join(', ') : "None",
+        redeemedFood: foodRedeemed
       };
 
-      if (immediate) {
-        executePost();
-      } else {
-        syncDebounceTimer = setTimeout(executePost, 3000);
-      }
+      fetch(GAS_API_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload)
+      })
+      .then(() => {
+        localStorage.removeItem('needs_sync');
+      })
+      .catch(err => {
+        console.warn("Sync error, will retry later:", err);
+      });
     }
 
     function fetchDataFromBackend() {
@@ -524,10 +541,8 @@
         .then(res => res.json())
         .then(data => {
           if (data) {
-            try {
-              localStorage.setItem('cached_system_data', JSON.stringify(data));
-            } catch (e) {}
-            applySystemData(data, false);
+            localStorage.setItem('cached_backend_data', JSON.stringify(data));
+            applyBackendPayload(data);
           }
         }).catch(err => console.warn("Fetch error:", err));
     }
@@ -553,22 +568,124 @@
       }
     }
 
+    // 解析固定時間格式 "14:30 - 15:30" 為當日分鐘數，並計算狀態與排序權重
+    function parseWorkshopTimeRange(timeStr) {
+      const match = String(timeStr).match(/(\d{1,2}):(\d{2})\s*[-–~至]\s*(\d{1,2}):(\d{2})/);
+      if (!match) {
+        return { startMins: 9999, endMins: 9999, status: 'upcoming' };
+      }
+      const startMins = parseInt(match[1], 10) * 60 + parseInt(match[2], 10);
+      const endMins = parseInt(match[3], 10) * 60 + parseInt(match[4], 10);
+
+      const now = new Date();
+      const nowMins = now.getHours() * 60 + now.getMinutes();
+
+      let status = 'upcoming';
+      if (nowMins >= startMins && nowMins < endMins) {
+        status = 'live';
+      } else if (nowMins >= endMins) {
+        status = 'ended';
+      }
+      return { startMins, endMins, status };
+    }
+
+    function toggleWorkshops() {
+      isWorkshopsExpanded = !isWorkshopsExpanded;
+      renderWorkshops(allWorkshopsData);
+    }
+
     function renderWorkshops(list) {
       const container = document.getElementById('workshop-list');
+      const toggleBtn = document.getElementById('btn-toggle-workshops');
+      const summaryBadge = document.getElementById('workshop-summary-badge');
       container.innerHTML = '';
+
       if (!list || list.length === 0) {
+        toggleBtn.classList.add('hidden');
+        summaryBadge.innerText = '共 0 項';
         container.innerHTML = 
           '<div class="p-3 bg-neo-bg border-2 border-neo-black text-center shadow-neo-sm">' +
             '<div class="font-bold text-xs text-slate-500">目前沒有進行中的工作坊與活動</div>' +
           '</div>';
         return;
       }
-      list.forEach(item => {
+
+      // 依狀態分組並按開始時間排序：1. 進行中 (live) -> 2. 即將開始 (upcoming) -> 3. 已結束 (ended)
+      const statusPriority = { live: 0, upcoming: 1, ended: 2 };
+      const enriched = list.map((item, idx) => {
+        const parsed = parseWorkshopTimeRange(item.time);
+        return { ...item, ...parsed, originalIndex: idx };
+      }).sort((a, b) => {
+        if (statusPriority[a.status] !== statusPriority[b.status]) {
+          return statusPriority[a.status] - statusPriority[b.status];
+        }
+        if (a.startMins !== b.startMins) {
+          return a.startMins - b.startMins;
+        }
+        return a.originalIndex - b.originalIndex;
+      });
+
+      const activeCount = enriched.filter(w => w.status !== 'ended').length;
+      summaryBadge.innerText = activeCount > 0 ? `尚有 ${activeCount} 場可參加` : `共 ${enriched.length} 場`;
+
+      const visibleItems = isWorkshopsExpanded 
+        ? enriched 
+        : enriched.slice(0, WORKSHOPS_COLLAPSED_LIMIT);
+
+      visibleItems.forEach(item => {
         const row = document.createElement('div');
-        row.className = "p-3 bg-neo-bg border-2 border-neo-black flex justify-between items-center shadow-neo-sm";
-        row.innerHTML = `<div><div class="font-black text-sm text-neo-black">${item.title}</div><div class="text-xs font-bold text-slate-600">地點：${item.location}</div></div><span class="bg-neo-yellow border border-neo-black font-black text-xs px-2 py-1">${item.time}</span>`;
+        
+        if (item.status === 'live') {
+          row.className = "p-3 bg-neo-yellow/30 border-2 border-neo-black flex justify-between items-center gap-2 shadow-neo-sm";
+          row.innerHTML = `
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="bg-neo-red text-white border border-neo-black font-black text-[10px] px-1.5 py-0.5 uppercase tracking-wider shrink-0">● 進行中</span>
+                <span class="font-black text-sm text-neo-black break-words">${item.title}</span>
+              </div>
+              <div class="text-xs font-bold text-slate-700 mt-0.5">地點：${item.location}</div>
+            </div>
+            <span class="bg-neo-yellow border-2 border-neo-black font-black text-xs px-2 py-1 shrink-0 font-mono">${item.time}</span>
+          `;
+        } else if (item.status === 'ended') {
+          row.className = "p-3 bg-slate-100 border-2 border-slate-400 flex justify-between items-center gap-2 opacity-65";
+          row.innerHTML = `
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="bg-slate-300 text-slate-700 border border-slate-500 font-black text-[10px] px-1.5 py-0.5 shrink-0">已結束</span>
+                <span class="font-bold text-sm text-slate-600 line-through break-words">${item.title}</span>
+              </div>
+              <div class="text-xs font-bold text-slate-500 mt-0.5">地點：${item.location}</div>
+            </div>
+            <span class="bg-slate-200 text-slate-600 border border-slate-400 font-bold text-xs px-2 py-1 shrink-0 font-mono">${item.time}</span>
+          `;
+        } else {
+          row.className = "p-3 bg-neo-bg border-2 border-neo-black flex justify-between items-center gap-2 shadow-neo-sm";
+          row.innerHTML = `
+            <div class="min-w-0 flex-1">
+              <div class="font-black text-sm text-neo-black break-words">${item.title}</div>
+              <div class="text-xs font-bold text-slate-600 mt-0.5">地點：${item.location}</div>
+            </div>
+            <span class="bg-neo-yellow border border-neo-black font-black text-xs px-2 py-1 shrink-0 font-mono">${item.time}</span>
+          `;
+        }
         container.appendChild(row);
       });
+
+      // 超過 4 項時顯示展開/收起按鈕
+      if (enriched.length > WORKSHOPS_COLLAPSED_LIMIT) {
+        toggleBtn.classList.remove('hidden');
+        if (isWorkshopsExpanded) {
+          toggleBtn.innerText = `▲ 收起部分活動 (僅顯示前 ${WORKSHOPS_COLLAPSED_LIMIT} 項)`;
+          toggleBtn.className = "w-full py-2.5 bg-slate-200 hover:bg-slate-300 text-neo-black font-black text-xs border-2 border-neo-black shadow-neo-sm active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all uppercase tracking-wider cursor-pointer";
+        } else {
+          const hiddenCount = enriched.length - WORKSHOPS_COLLAPSED_LIMIT;
+          toggleBtn.innerText = `▼ 查看全部活動 (還有 ${hiddenCount} 項)`;
+          toggleBtn.className = "w-full py-2.5 bg-neo-yellow hover:bg-yellow-300 text-neo-black font-black text-xs border-2 border-neo-black shadow-neo-sm active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all uppercase tracking-wider cursor-pointer";
+        }
+      } else {
+        toggleBtn.classList.add('hidden');
+      }
     }
 
     function getCostByType(type) {
@@ -661,7 +778,7 @@
       const redeemedType = currentRedeemType;
       closeRedeemConfirmModal();
       updateProgress();
-      syncToBackend(true); // 兌換獎品立即寫入後端
+      syncToBackend(true);
 
       let title = '已成功兌換禮物';
       if (redeemedType === 'Small') title = '已成功兌換細獎';
@@ -689,7 +806,7 @@
         localStorage.setItem('user_stamps', JSON.stringify(userStamps));
         renderBoothGrid();
         updateProgress();
-        syncToBackend(false); // 蓋印採用 3 秒防抖合併寫入，降低高峰併發壓力
+        syncToBackend(false);
         alert(`⚡ 蓋印成功！獲得 ${boothId} 印章！`);
       } else {
         alert(`💡 已收集過 ${boothId} 印章！`);
@@ -828,7 +945,7 @@
       foodRedeemed = true;
       localStorage.setItem('food_redeemed', 'true');
       updateFoodButton();
-      syncToBackend(true); // 兌換小食立即寫入後端
+      syncToBackend(true);
       startVerificationScreen('已成功兌換小食');
     }
 
