@@ -128,23 +128,23 @@
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzA4Iuflm5N6faXsrUXPQ8Q68VNfcDysS_3ru281wLymPPxzt92fliq2k7Of0pIdCBcHw/exec";
     let currentBooth = "B01";
     let qrcodeInstance = null;
-    let countdownSeconds = 180;
     let boothMap = {};
     let totalBooths = 19;
     let revealTimer = null;
     let wakeLock = null;
+    let lastRenderedBlock = -1;
 
     document.addEventListener('DOMContentLoaded', () => {
       initBoothSelect();
       fetchBackendData();
-      updateQRCode();
+      syncWithSystemClock();
       startTimers();
       requestScreenWakeLock();
 
-      // 切回分頁或解鎖 iPad 時自動重新保持螢幕常亮
       document.addEventListener('visibilitychange', () => {
         if (!document.hidden) {
           requestScreenWakeLock();
+          syncWithSystemClock(); // 喚醒 iPad 瞬間立即同步最新時間區塊
         }
       });
     });
@@ -171,7 +171,7 @@
     }
 
     function revealCodeTemporarily() {
-      requestScreenWakeLock(); // 趁使用者互動時確保啟用常亮鎖
+      requestScreenWakeLock();
       const qrMask = document.getElementById('qr-mask');
       const pinMask = document.getElementById('pin-mask');
 
@@ -236,11 +236,11 @@
     }
 
     function changeBooth() {
-      lockMasksImmediately(); // 切換攤位時立即重新遮蔽保護
+      lockMasksImmediately();
       currentBooth = document.getElementById('booth-select').value;
       updateBoothTitle();
-      countdownSeconds = 180;
-      updateQRCode();
+      lastRenderedBlock = -1; // 強制重繪新攤位的 QR Code
+      syncWithSystemClock();
     }
 
     function generateDynamicPin(boothNum, timeBlock) {
@@ -250,8 +250,7 @@
       return 1000 + (Math.abs(hash) % 9000);
     }
 
-    function updateQRCode() {
-      const timeBlock = Math.floor(Date.now() / (1000 * 180));
+    function updateQRCode(timeBlock) {
       const payload = 'booth:' + currentBooth + ':t:' + timeBlock;
 
       const boothNum = parseInt(currentBooth.replace("B", ""));
@@ -271,21 +270,27 @@
       });
     }
 
+    // 直接從系統時鐘反推 180 秒時間區塊與剩餘秒數，徹底消除休眠漂移
+    function syncWithSystemClock() {
+      const now = new Date();
+      document.getElementById('clock-display').innerText = now.toTimeString().split(' ')[0];
+
+      const totalSeconds = Math.floor(now.getTime() / 1000);
+      const currentBlock = Math.floor(totalSeconds / 180);
+      const remainingSeconds = 180 - (totalSeconds % 180);
+
+      if (currentBlock !== lastRenderedBlock) {
+        lastRenderedBlock = currentBlock;
+        updateQRCode(currentBlock);
+      }
+
+      const mins = Math.floor(remainingSeconds / 60).toString().padStart(2, '0');
+      const secs = (remainingSeconds % 60).toString().padStart(2, '0');
+      document.getElementById('refresh-timer').innerText = mins + ':' + secs;
+    }
+
     function startTimers() {
-      setInterval(() => {
-        const now = new Date();
-        document.getElementById('clock-display').innerText = now.toTimeString().split(' ')[0];
-
-        countdownSeconds--;
-        if (countdownSeconds <= 0) {
-          countdownSeconds = 180;
-          updateQRCode();
-        }
-
-        const mins = Math.floor(countdownSeconds / 60).toString().padStart(2, '0');
-        const secs = (countdownSeconds % 60).toString().padStart(2, '0');
-        document.getElementById('refresh-timer').innerText = mins + ':' + secs;
-      }, 1000);
+      setInterval(syncWithSystemClock, 1000);
     }
   </script>
 </body>
