@@ -263,20 +263,32 @@
     </div>
   </div>
 
-  <!-- 全螢幕動態驗證頁面 -->
+  <!-- 全螢幕動態驗證頁面 (含真實兌換時間戳記與 3 分鐘自動失效) -->
   <div id="verification-screen" class="fixed inset-0 animate-neo-flash hidden z-50 flex flex-col items-center justify-between p-6 text-center text-neo-black">
-    <div class="space-y-2 pt-6">
+    <div class="space-y-2 pt-4">
       <span class="bg-white border-4 border-neo-black font-black text-xs px-4 py-1.5 shadow-neo-md uppercase tracking-widest">學校開放日 2026 官方憑證</span>
-      <h2 id="prize-title" class="text-4xl font-black uppercase tracking-tight bg-neo-yellow border-4 border-neo-black p-3 shadow-neo-lg rotate-1">已成功兌換禮物</h2>
+      <h2 id="prize-title" class="text-3xl font-black uppercase tracking-tight bg-neo-yellow border-4 border-neo-black p-3 shadow-neo-lg rotate-1">已成功兌換禮物</h2>
     </div>
 
-    <div class="bg-white border-8 border-neo-black p-6 shadow-neo-xl w-full max-w-xs space-y-3 -rotate-1">
-      <div class="text-xs font-black uppercase tracking-wider text-slate-500">請出示此畫面給工作人員</div>
-      <div id="timer-display" class="text-6xl font-black font-mono tracking-wider bg-neo-violet border-4 border-neo-black p-2">00:00</div>
-      <div class="text-xs font-black bg-neo-yellow border-2 border-neo-black py-1">⚡ 即時動態跳動秒數 (防截圖)</div>
+    <div class="bg-white border-8 border-neo-black p-5 shadow-neo-xl w-full max-w-xs space-y-3 -rotate-1">
+      <div id="verify-instruction" class="text-xs font-black uppercase tracking-wider text-slate-600">請即時出示此畫面給工作人員</div>
+      
+      <div class="bg-neo-bg border-2 border-neo-black py-1.5 px-2">
+        <div class="text-[11px] font-bold text-slate-500 uppercase">兌換時間</div>
+        <div id="redeemed-timestamp" class="text-xl font-black font-mono text-neo-red">--:--:--</div>
+      </div>
+
+      <div>
+        <div class="text-[11px] font-bold text-slate-500 uppercase mb-1">目前即時時間</div>
+        <div id="timer-display" class="text-4xl font-black font-mono tracking-wider bg-neo-violet border-4 border-neo-black p-2">--:--:--</div>
+      </div>
+
+      <div id="verify-status-badge" class="text-xs font-black bg-neo-yellow border-2 border-neo-black py-1.5 px-2">
+        ⚡ 有效剩餘：<span id="verify-countdown" class="font-mono">03:00</span> (防截圖)
+      </div>
     </div>
 
-    <div class="pb-6 w-full max-w-xs">
+    <div class="pb-4 w-full max-w-xs">
       <button onclick="closeVerificationScreen()" class="w-full py-4 bg-white border-4 border-neo-black font-black text-base shadow-neo-md uppercase active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all">返回主頁面</button>
     </div>
   </div>
@@ -303,7 +315,6 @@
     let currentRedeemType = null;
     let isRedeeming = false;
 
-    // 支援新舊版歷史紀錄結構：{ type: 'Small', cost: 1 } 或舊版 'Small'
     let redemptionHistory = JSON.parse(localStorage.getItem('redemption_history')) || [];
     let oldStatus = localStorage.getItem('redemption_status');
     if (oldStatus && oldStatus !== 'None' && redemptionHistory.length === 0) {
@@ -312,10 +323,8 @@
       localStorage.removeItem('redemption_status');
     }
 
-    // 走馬燈狀態（初始設為空字串，確保首次載入必觸發初始化與速率計算）
     let currentDisplayedMarquee = "";
     let pendingMarqueeText = null;
-    let pendingMarqueeDuration = null;
     let isUpdatingMarquee = false;
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -331,7 +340,6 @@
       initMarqueeSync();
       fetchDataFromBackend();
 
-      // 每 60 秒輪詢後端資料，並檢查是否有離線積壓的同步請求
       setInterval(() => {
         if (localStorage.getItem('needs_sync') === 'true') {
           syncToBackend();
@@ -339,7 +347,6 @@
         fetchDataFromBackend();
       }, 60000);
 
-      // 網路恢復連線時自動補傳離線資料
       window.addEventListener('online', () => {
         if (localStorage.getItem('needs_sync') === 'true') {
           syncToBackend();
@@ -350,21 +357,20 @@
     function openMapModal() { document.getElementById('map-modal').classList.remove('hidden'); }
     function closeMapModal() { document.getElementById('map-modal').classList.add('hidden'); }
 
-    // 走馬燈無縫循環及速率同步控制（於歸零幀套用新速率，防止跳格）
     function initMarqueeSync() {
       const track = document.getElementById('marquee-track');
       if (!track) return;
 
       track.addEventListener('animationiteration', () => {
         if (pendingMarqueeText !== null && !isUpdatingMarquee) {
-          safelyUpdateMarquee(pendingMarqueeText, true);
+          safelyUpdateMarquee(pendingMarqueeText);
           pendingMarqueeText = null;
         }
       });
 
       document.addEventListener('visibilitychange', () => {
         if (!document.hidden && pendingMarqueeText !== null && !isUpdatingMarquee) {
-          safelyUpdateMarquee(pendingMarqueeText, true);
+          safelyUpdateMarquee(pendingMarqueeText);
           pendingMarqueeText = null;
         }
       });
@@ -375,7 +381,7 @@
       return Math.max(15, Math.round(12 + (charCount * 0.45)));
     }
 
-    function safelyUpdateMarquee(text, isAtIterationStart = false) {
+    function safelyUpdateMarquee(text) {
       if (!text || typeof text !== 'string') return;
       const cleanText = text.trim();
       if (cleanText === "" || cleanText === currentDisplayedMarquee) return;
@@ -394,13 +400,7 @@
         requestAnimationFrame(() => {
           part1.innerText = formattedText;
           part2.innerText = formattedText;
-
-          if (isAtIterationStart) {
-            track.style.setProperty('--marquee-duration', dynamicDuration + 's');
-          } else {
-            // 首次載入時平滑設定初始速率
-            track.style.setProperty('--marquee-duration', dynamicDuration + 's');
-          }
+          track.style.setProperty('--marquee-duration', dynamicDuration + 's');
 
           setTimeout(() => {
             isUpdatingMarquee = false;
@@ -421,13 +421,11 @@
 
     function updateRoleBadge() { document.getElementById('user-role-badge').innerText = userRole || '訪客'; }
 
-    // 帶有離線重試標記的後端同步機制
     function syncToBackend() {
       localStorage.setItem('needs_sync', 'true');
       if (!GAS_API_URL || GAS_API_URL.includes("YOUR_GOOGLE_APPS_SCRIPT")) return;
       if (!navigator.onLine) return;
 
-      // 提取純獎品名稱陣列傳給後端，維持與 Google Sheet 統計公式 100% 相容
       const prizeTypes = redemptionHistory.map(item => typeof item === 'object' ? item.type : item);
 
       const payload = {
@@ -469,7 +467,7 @@
             const fetchedMarquee = String(data.marquee).trim();
             if (fetchedMarquee !== "" && fetchedMarquee !== currentDisplayedMarquee) {
               if (currentDisplayedMarquee === "") {
-                safelyUpdateMarquee(fetchedMarquee, true);
+                safelyUpdateMarquee(fetchedMarquee);
               } else {
                 pendingMarqueeText = fetchedMarquee;
               }
@@ -532,7 +530,6 @@
       return 0;
     }
 
-    // 優先讀取兌換當下鎖定的 cost 快照，向下相容舊版純字串紀錄
     function getSpentStamps() {
       let spent = 0;
       redemptionHistory.forEach(item => {
@@ -594,7 +591,6 @@
       document.getElementById('redeem-confirm-modal').classList.remove('hidden');
     }
 
-    // 帶有防連點鎖與花費快照的兌換邏輯
     function confirmRedeem() {
       if (!currentRedeemType || isRedeeming) return;
       
@@ -655,10 +651,16 @@
     let animationFrameId = null;
 
     function startScanner() {
-      stopScanner(); // 確保清除任何殘留的動畫幀與串流
+      stopScanner();
       document.getElementById('scanner-modal').classList.remove('hidden');
       const video = document.getElementById('scanner-video');
-      navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+      navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          facingMode: "environment",
+          width: { ideal: 640 },
+          height: { ideal: 480 }
+        } 
+      })
         .then(stream => {
           videoStream = stream;
           video.srcObject = stream;
@@ -676,6 +678,10 @@
       if (animationFrameId) {
         cancelAnimationFrame(animationFrameId);
         animationFrameId = null;
+      }
+      const video = document.getElementById('scanner-video');
+      if (video) {
+        video.srcObject = null;
       }
       if (videoStream) {
         videoStream.getTracks().forEach(track => track.stop());
@@ -777,18 +783,57 @@
       startVerificationScreen('已成功兌換小食');
     }
 
+    // 帶有真實兌換時間戳記與 3 分鐘自動失效的動態驗證畫面
     function startVerificationScreen(titleText) {
-      document.getElementById('prize-title').innerText = titleText;
-      document.getElementById('verification-screen').classList.remove('hidden');
-      if (timerInterval) clearInterval(timerInterval);
-      let seconds = 0;
+      const screen = document.getElementById('verification-screen');
+      const titleEl = document.getElementById('prize-title');
+      const redeemedTimeEl = document.getElementById('redeemed-timestamp');
       const timerDisplay = document.getElementById('timer-display');
-      timerDisplay.innerText = "00:00";
+      const statusBadge = document.getElementById('verify-status-badge');
+      const instructionEl = document.getElementById('verify-instruction');
+
+      // 恢復有效外觀樣式
+      screen.classList.remove('bg-slate-400');
+      screen.classList.add('animate-neo-flash');
+      titleEl.innerText = titleText;
+      titleEl.className = "text-3xl font-black uppercase tracking-tight bg-neo-yellow border-4 border-neo-black p-3 shadow-neo-lg rotate-1";
+      instructionEl.innerText = "請即時出示此畫面給工作人員";
+      statusBadge.className = "text-xs font-black bg-neo-yellow border-2 border-neo-black py-1.5 px-2";
+
+      const startTime = Date.now();
+      const startDate = new Date(startTime);
+      redeemedTimeEl.innerText = startDate.toTimeString().split(' ')[0];
+      timerDisplay.innerText = startDate.toTimeString().split(' ')[0];
+
+      screen.classList.remove('hidden');
+
+      if (timerInterval) clearInterval(timerInterval);
+      
+      const VALID_DURATION_SEC = 180; // 3 分鐘有效期限
+
       timerInterval = setInterval(() => {
-        seconds++;
-        const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
-        const secs = (seconds % 60).toString().padStart(2, '0');
-        timerDisplay.innerText = mins + ':' + secs;
+        const now = new Date();
+        const elapsedSec = Math.floor((now.getTime() - startTime) / 1000);
+        const remainingSec = Math.max(0, VALID_DURATION_SEC - elapsedSec);
+
+        // 即時更新目前時鐘
+        timerDisplay.innerText = now.toTimeString().split(' ')[0];
+
+        if (remainingSec > 0) {
+          const mins = Math.floor(remainingSec / 60).toString().padStart(2, '0');
+          const secs = (remainingSec % 60).toString().padStart(2, '0');
+          statusBadge.innerHTML = `⚡ 有效剩餘：<span class="font-mono">${mins}:${secs}</span> (防截圖)`;
+        } else {
+          // 超過 3 分鐘自動轉為過期狀態
+          clearInterval(timerInterval);
+          screen.classList.remove('animate-neo-flash');
+          screen.classList.add('bg-slate-400');
+          titleEl.innerText = "憑證已過期";
+          titleEl.className = "text-3xl font-black uppercase tracking-tight bg-slate-200 text-slate-500 border-4 border-neo-black p-3 shadow-neo-lg";
+          instructionEl.innerText = "此兌換畫面已超過 3 分鐘有效期限";
+          statusBadge.className = "text-xs font-black bg-neo-red text-white border-2 border-neo-black py-1.5 px-2";
+          statusBadge.innerText = "⚠️ 已逾時失效 (請按下方返回)";
+        }
       }, 1000);
     }
 
@@ -796,7 +841,11 @@
       isRedeeming = false;
       document.getElementById('redeem-confirm-modal').classList.add('hidden'); 
     }
+
     function closeVerificationScreen() {
+      const isConfirmed = confirm("⚠️ 確定已向工作人員出示並完成領取嗎？\n\n返回主頁面後，此動態驗證憑證將會關閉。");
+      if (!isConfirmed) return;
+
       if (timerInterval) clearInterval(timerInterval);
       document.getElementById('verification-screen').classList.add('hidden');
     }
