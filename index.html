@@ -301,18 +301,21 @@
     let boothNames = {};
     let timerInterval = null;
     let currentRedeemType = null;
+    let isRedeeming = false;
 
+    // 支援新舊版歷史紀錄結構：{ type: 'Small', cost: 1 } 或舊版 'Small'
     let redemptionHistory = JSON.parse(localStorage.getItem('redemption_history')) || [];
     let oldStatus = localStorage.getItem('redemption_status');
     if (oldStatus && oldStatus !== 'None' && redemptionHistory.length === 0) {
-        redemptionHistory = [oldStatus];
-        localStorage.setItem('redemption_history', JSON.stringify(redemptionHistory));
-        localStorage.removeItem('redemption_status');
+      redemptionHistory = [oldStatus];
+      localStorage.setItem('redemption_history', JSON.stringify(redemptionHistory));
+      localStorage.removeItem('redemption_status');
     }
 
-    // ⚡ 走馬燈無縫同步機制專用變數
-    let currentDisplayedMarquee = "⚡ 歡迎光臨學校開放日 2026！集齊印章自由選換 4 大獎品！";
+    // 走馬燈狀態（初始設為空字串，確保首次載入必觸發初始化與速率計算）
+    let currentDisplayedMarquee = "";
     let pendingMarqueeText = null;
+    let pendingMarqueeDuration = null;
     let isUpdatingMarquee = false;
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -327,69 +330,86 @@
       
       initMarqueeSync();
       fetchDataFromBackend();
-      setInterval(fetchDataFromBackend, 60000);
+
+      // 每 60 秒輪詢後端資料，並檢查是否有離線積壓的同步請求
+      setInterval(() => {
+        if (localStorage.getItem('needs_sync') === 'true') {
+          syncToBackend();
+        }
+        fetchDataFromBackend();
+      }, 60000);
+
+      // 網路恢復連線時自動補傳離線資料
+      window.addEventListener('online', () => {
+        if (localStorage.getItem('needs_sync') === 'true') {
+          syncToBackend();
+        }
+      });
     });
 
     function openMapModal() { document.getElementById('map-modal').classList.remove('hidden'); }
     function closeMapModal() { document.getElementById('map-modal').classList.add('hidden'); }
 
-    // ⚡ 走馬燈無縫循環及鎖定控制
+    // 走馬燈無縫循環及速率同步控制（於歸零幀套用新速率，防止跳格）
     function initMarqueeSync() {
       const track = document.getElementById('marquee-track');
       if (!track) return;
 
       track.addEventListener('animationiteration', () => {
         if (pendingMarqueeText !== null && !isUpdatingMarquee) {
-          safelyUpdateMarquee(pendingMarqueeText);
+          safelyUpdateMarquee(pendingMarqueeText, true);
           pendingMarqueeText = null;
         }
       });
 
       document.addEventListener('visibilitychange', () => {
         if (!document.hidden && pendingMarqueeText !== null && !isUpdatingMarquee) {
-          safelyUpdateMarquee(pendingMarqueeText);
+          safelyUpdateMarquee(pendingMarqueeText, true);
           pendingMarqueeText = null;
         }
       });
     }
 
-// ⚡ 恆定速率渲染防 Blank 核心函式
-  function safelyUpdateMarquee(text) {
-    if (!text || typeof text !== 'string') return;
-    const cleanText = text.trim();
-    if (cleanText === "" || cleanText === currentDisplayedMarquee) return;
-
-    isUpdatingMarquee = true;
-    currentDisplayedMarquee = cleanText;
-
-    const formattedText = cleanText.startsWith("⚡") ? cleanText : "⚡ " + cleanText;
-
-    const part1 = document.getElementById('marquee-part-1');
-    const part2 = document.getElementById('marquee-part-2');
-    const track = document.getElementById('marquee-track');
-
-    if (part1 && part2 && track) {
-      requestAnimationFrame(() => {
-        part1.innerText = formattedText;
-        part2.innerText = formattedText;
-
-        // 🔥 恆定速率演算法 (Constant Speed Calculation)：
-        // 1. 基礎時間 12 秒（確保即使極短文字也有充足展示時間）
-        // 2. 每個字給予 0.45 秒（無論文字多長，閱讀體感速度完全一致）
-        const charCount = formattedText.length;
-        const dynamicDuration = Math.max(15, Math.round(12 + (charCount * 0.45)));
-        
-        // 寫入 CSS 變數控制速度
-        track.style.setProperty('--marquee-duration', dynamicDuration + 's');
-
-        setTimeout(() => {
-          isUpdatingMarquee = false;
-        }, 100);
-      });
-    } else {
-      isUpdatingMarquee = false;
+    function calculateMarqueeDuration(formattedText) {
+      const charCount = formattedText.length;
+      return Math.max(15, Math.round(12 + (charCount * 0.45)));
     }
-  }
+
+    function safelyUpdateMarquee(text, isAtIterationStart = false) {
+      if (!text || typeof text !== 'string') return;
+      const cleanText = text.trim();
+      if (cleanText === "" || cleanText === currentDisplayedMarquee) return;
+
+      isUpdatingMarquee = true;
+      currentDisplayedMarquee = cleanText;
+
+      const formattedText = cleanText.startsWith("⚡") ? cleanText : "⚡ " + cleanText;
+      const dynamicDuration = calculateMarqueeDuration(formattedText);
+
+      const part1 = document.getElementById('marquee-part-1');
+      const part2 = document.getElementById('marquee-part-2');
+      const track = document.getElementById('marquee-track');
+
+      if (part1 && part2 && track) {
+        requestAnimationFrame(() => {
+          part1.innerText = formattedText;
+          part2.innerText = formattedText;
+
+          if (isAtIterationStart) {
+            track.style.setProperty('--marquee-duration', dynamicDuration + 's');
+          } else {
+            // 首次載入時平滑設定初始速率
+            track.style.setProperty('--marquee-duration', dynamicDuration + 's');
+          }
+
+          setTimeout(() => {
+            isUpdatingMarquee = false;
+          }, 100);
+        });
+      } else {
+        isUpdatingMarquee = false;
+      }
+    }
 
     function selectRole(role) {
       userRole = role;
@@ -401,21 +421,35 @@
 
     function updateRoleBadge() { document.getElementById('user-role-badge').innerText = userRole || '訪客'; }
 
+    // 帶有離線重試標記的後端同步機制
     function syncToBackend() {
+      localStorage.setItem('needs_sync', 'true');
       if (!GAS_API_URL || GAS_API_URL.includes("YOUR_GOOGLE_APPS_SCRIPT")) return;
+      if (!navigator.onLine) return;
+
+      // 提取純獎品名稱陣列傳給後端，維持與 Google Sheet 統計公式 100% 相容
+      const prizeTypes = redemptionHistory.map(item => typeof item === 'object' ? item.type : item);
+
       const payload = {
         guestId: guestId,
         role: userRole,
         stamps: userStamps,
-        redeemedPrize: redemptionHistory.length > 0 ? redemptionHistory.join(', ') : "None",
+        redeemedPrize: prizeTypes.length > 0 ? prizeTypes.join(', ') : "None",
         redeemedFood: foodRedeemed
       };
+
       fetch(GAS_API_URL, {
         method: 'POST',
         mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify(payload)
-      }).catch(err => console.warn("Sync error:", err));
+      })
+      .then(() => {
+        localStorage.removeItem('needs_sync');
+      })
+      .catch(err => {
+        console.warn("Sync error, will retry later:", err);
+      });
     }
 
     function fetchDataFromBackend() {
@@ -435,7 +469,7 @@
             const fetchedMarquee = String(data.marquee).trim();
             if (fetchedMarquee !== "" && fetchedMarquee !== currentDisplayedMarquee) {
               if (currentDisplayedMarquee === "") {
-                safelyUpdateMarquee(fetchedMarquee);
+                safelyUpdateMarquee(fetchedMarquee, true);
               } else {
                 pendingMarqueeText = fetchedMarquee;
               }
@@ -490,13 +524,23 @@
       });
     }
 
+    function getCostByType(type) {
+      if (type === 'Small') return MIN_STAMPS_SMALL;
+      if (type === 'Medium') return MIN_STAMPS_MEDIUM;
+      if (type === 'Big') return MIN_STAMPS_BIG;
+      if (type === 'Grand') return MIN_STAMPS_GRAND;
+      return 0;
+    }
+
+    // 優先讀取兌換當下鎖定的 cost 快照，向下相容舊版純字串紀錄
     function getSpentStamps() {
       let spent = 0;
-      redemptionHistory.forEach(prize => {
-        if(prize === 'Small') spent += MIN_STAMPS_SMALL;
-        if(prize === 'Medium') spent += MIN_STAMPS_MEDIUM;
-        if(prize === 'Big') spent += MIN_STAMPS_BIG;
-        if(prize === 'Grand') spent += MIN_STAMPS_GRAND;
+      redemptionHistory.forEach(item => {
+        if (typeof item === 'object' && item !== null && typeof item.cost === 'number') {
+          spent += item.cost;
+        } else {
+          spent += getCostByType(item);
+        }
       });
       return spent;
     }
@@ -504,7 +548,7 @@
     function updateProgress() {
       const totalStamps = userStamps.length;
       const spentStamps = getSpentStamps();
-      const availableStamps = totalStamps - spentStamps;
+      const availableStamps = Math.max(0, totalStamps - spentStamps);
 
       document.getElementById('stamp-count').innerText = `${availableStamps} / 總共集齊 ${totalStamps}`;
       document.getElementById('progress-bar').style.width = Math.min(100, ((totalStamps / TOTAL_BOOTHS) * 100)) + '%';
@@ -530,15 +574,19 @@
 
     function openRedeemModal(type) {
       currentRedeemType = type;
-      let prizeName = '';
-      let cost = 0;
-      if (type === 'Small') { prizeName = '細獎'; cost = MIN_STAMPS_SMALL; }
-      else if (type === 'Medium') { prizeName = '中獎'; cost = MIN_STAMPS_MEDIUM; }
-      else if (type === 'Big') { prizeName = '大獎'; cost = MIN_STAMPS_BIG; }
-      else if (type === 'Grand') { prizeName = '特大獎'; cost = MIN_STAMPS_GRAND; }
+      isRedeeming = false;
+      const confirmBtn = document.getElementById('btn-redeem-confirm');
+      if (confirmBtn) confirmBtn.disabled = false;
 
-      const available = userStamps.length - getSpentStamps();
-      const remain = available - cost;
+      let prizeName = '';
+      if (type === 'Small') prizeName = '細獎';
+      else if (type === 'Medium') prizeName = '中獎';
+      else if (type === 'Big') prizeName = '大獎';
+      else if (type === 'Grand') prizeName = '特大獎';
+
+      const cost = getCostByType(type);
+      const available = Math.max(0, userStamps.length - getSpentStamps());
+      const remain = Math.max(0, available - cost);
 
       document.getElementById('redeem-modal-title').innerText = `確定兌換 ${prizeName} 嗎？`;
       document.getElementById('redeem-modal-tip').innerHTML = `系統將扣除 <b class="text-neo-red text-base">${cost}</b> 個可用印章。<br>兌換後您還剩下 <b>${remain}</b> 個印章可繼續使用！`;
@@ -546,21 +594,38 @@
       document.getElementById('redeem-confirm-modal').classList.remove('hidden');
     }
 
+    // 帶有防連點鎖與花費快照的兌換邏輯
     function confirmRedeem() {
-      if(currentRedeemType) {
-        redemptionHistory.push(currentRedeemType);
-        localStorage.setItem('redemption_history', JSON.stringify(redemptionHistory));
+      if (!currentRedeemType || isRedeeming) return;
+      
+      const cost = getCostByType(currentRedeemType);
+      const available = userStamps.length - getSpentStamps();
+      if (available < cost) {
+        alert("可用印章不足！");
         closeRedeemConfirmModal();
-        updateProgress();
-        syncToBackend();
-
-        let title = '已成功兌換禮物';
-        if(currentRedeemType === 'Small') title = '已成功兌換細獎';
-        if(currentRedeemType === 'Medium') title = '已成功兌換中獎';
-        if(currentRedeemType === 'Big') title = '已成功兌換大獎';
-        if(currentRedeemType === 'Grand') title = '已成功兌換特大獎';
-        startVerificationScreen(title);
+        return;
       }
+
+      isRedeeming = true;
+      const confirmBtn = document.getElementById('btn-redeem-confirm');
+      if (confirmBtn) confirmBtn.disabled = true;
+
+      redemptionHistory.push({ type: currentRedeemType, cost: cost });
+      localStorage.setItem('redemption_history', JSON.stringify(redemptionHistory));
+      
+      const redeemedType = currentRedeemType;
+      closeRedeemConfirmModal();
+      updateProgress();
+      syncToBackend();
+
+      let title = '已成功兌換禮物';
+      if (redeemedType === 'Small') title = '已成功兌換細獎';
+      if (redeemedType === 'Medium') title = '已成功兌換中獎';
+      if (redeemedType === 'Big') title = '已成功兌換大獎';
+      if (redeemedType === 'Grand') title = '已成功兌換特大獎';
+      
+      isRedeeming = false;
+      startVerificationScreen(title);
     }
 
     function updateFoodButton() {
@@ -587,7 +652,10 @@
     }
 
     let videoStream = null;
+    let animationFrameId = null;
+
     function startScanner() {
+      stopScanner(); // 確保清除任何殘留的動畫幀與串流
       document.getElementById('scanner-modal').classList.remove('hidden');
       const video = document.getElementById('scanner-video');
       navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
@@ -596,7 +664,7 @@
           video.srcObject = stream;
           video.setAttribute("playsinline", true);
           video.play();
-          requestAnimationFrame(scanQRCode);
+          animationFrameId = requestAnimationFrame(scanQRCode);
         })
         .catch(() => {
           alert("無法打開相機，請使用「印章動態碼」。");
@@ -605,11 +673,20 @@
     }
 
     function stopScanner() {
-      if (videoStream) videoStream.getTracks().forEach(track => track.stop());
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+      }
+      if (videoStream) {
+        videoStream.getTracks().forEach(track => track.stop());
+        videoStream = null;
+      }
       document.getElementById('scanner-modal').classList.add('hidden');
     }
 
     function scanQRCode() {
+      if (document.getElementById('scanner-modal').classList.contains('hidden')) return;
+
       const video = document.getElementById('scanner-video');
       const canvas = document.getElementById('scanner-canvas');
       if (video.readyState === video.HAVE_ENOUGH_DATA) {
@@ -626,9 +703,7 @@
           return;
         }
       }
-      if (!document.getElementById('scanner-modal').classList.contains('hidden')) {
-        requestAnimationFrame(scanQRCode);
-      }
+      animationFrameId = requestAnimationFrame(scanQRCode);
     }
 
     function handleScannedData(data) {
@@ -641,7 +716,7 @@
           if (Math.abs(currentBlock - qrTimeBlock) <= 1) {
             addStamp(boothId);
           } else {
-            alert("⚠️ 此 QR Code 已過期！(請掃描攤位 iPad 最新顯示的動態 QR Code，切勿使用舊截圖)");
+            alert("⚠️ 此 QR Code 已過期！\n1. 請掃描攤位 iPad 最新顯示的動態碼（切勿使用舊截圖）\n2. 若為現場掃描，請確認手機已開啟「自動設定日期與時間」");
           }
         } else {
           alert("⚠️ 無效或過期的 QR Code 格式！");
@@ -685,7 +760,7 @@
         closePinModal();
         document.getElementById('pin-input').value = '';
       } else {
-        alert("印章動態碼無效或已過期，請向攤位服務生領取印章動態碼！");
+        alert("印章動態碼無效或已過期，請向攤位服務生領取最新印章動態碼！（若剛領取仍失敗，請檢查手機時間是否準確）");
       }
     }
 
@@ -693,6 +768,7 @@
     function closeFoodConfirmModal() { document.getElementById('food-confirm-modal').classList.add('hidden'); }
 
     function triggerRedeemFood() {
+      if (foodRedeemed) return;
       closeFoodConfirmModal();
       foodRedeemed = true;
       localStorage.setItem('food_redeemed', 'true');
@@ -716,7 +792,10 @@
       }, 1000);
     }
 
-    function closeRedeemConfirmModal() { document.getElementById('redeem-confirm-modal').classList.add('hidden'); }
+    function closeRedeemConfirmModal() { 
+      isRedeeming = false;
+      document.getElementById('redeem-confirm-modal').classList.add('hidden'); 
+    }
     function closeVerificationScreen() {
       if (timerInterval) clearInterval(timerInterval);
       document.getElementById('verification-screen').classList.add('hidden');
