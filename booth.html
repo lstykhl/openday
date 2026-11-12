@@ -43,7 +43,6 @@
       background-size: 30px 30px;
     }
     
-    /* 防偷看遮罩條紋背景 */
     .mask-pattern {
       background-color: #000000;
       background-image: repeating-linear-gradient(45deg, #FFD93D 0, #FFD93D 15px, #000000 0, #000000 30px);
@@ -71,7 +70,7 @@
     <div class="bg-white border-8 border-neo-black p-8 shadow-neo-2xl text-center space-y-6 relative -rotate-1">
       
       <div class="absolute -top-6 left-1/2 -translate-x-1/2 bg-neo-red border-4 border-neo-black px-6 py-1.5 font-black text-lg text-white uppercase tracking-widest rotate-2 shadow-neo-md">
-        請用手機掃描蓋印
+        請用手機開啟 WEB APP 掃描蓋印
       </div>
 
       <div class="pt-4 space-y-1">
@@ -79,14 +78,11 @@
         <p class="text-sm font-bold text-slate-600">請掃描下方動態 QR Code 領取印章</p>
       </div>
 
-      <!-- QR Code 容器與安全遮罩 -->
       <div class="flex justify-center my-6">
         <div class="p-4 bg-neo-yellow border-8 border-neo-black shadow-neo-lg inline-block relative overflow-hidden">
           
-          <!-- 二維碼 -->
           <div id="qrcode" class="bg-white p-4 border-4 border-neo-black"></div>
 
-          <!-- 防偷拍覆蓋遮罩 (點擊或按住揭開) -->
           <div id="qr-mask" onclick="revealCodeTemporarily()" class="absolute inset-0 mask-pattern flex flex-col items-center justify-center p-4 cursor-pointer transition-opacity duration-200 z-20">
             <div class="bg-white border-4 border-neo-black p-4 shadow-neo-md text-center rotate-1 hover:scale-105 transition-transform">
               <span class="text-3xl">🔒</span>
@@ -107,7 +103,6 @@
   </main>
 
   <footer class="max-w-4xl mx-auto w-full flex justify-between items-end">
-    <!-- 印章動態碼區域 (亦受遮罩保護) -->
     <div class="bg-neo-violet border-4 border-neo-black p-4 shadow-neo-lg rotate-2 max-w-xs relative overflow-hidden">
       <div class="font-black text-xs uppercase tracking-wider text-slate-800">相機無法開啟？印章動態碼：</div>
       
@@ -115,7 +110,6 @@
         <div id="rescue-code" class="text-4xl font-black font-mono tracking-widest text-neo-black bg-white border-2 border-neo-black px-3 py-1 text-center">
           ----
         </div>
-        <!-- 動態碼獨立小型遮罩 -->
         <div id="pin-mask" onclick="revealCodeTemporarily()" class="absolute inset-0 bg-neo-black text-neo-yellow border-2 border-neo-black font-black text-sm flex items-center justify-center cursor-pointer">
           🔒 點擊解鎖動態碼
         </div>
@@ -138,16 +132,46 @@
     let boothMap = {};
     let totalBooths = 19;
     let revealTimer = null;
+    let wakeLock = null;
 
     document.addEventListener('DOMContentLoaded', () => {
       initBoothSelect();
       fetchBackendData();
       updateQRCode();
       startTimers();
+      requestScreenWakeLock();
+
+      // 切回分頁或解鎖 iPad 時自動重新保持螢幕常亮
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+          requestScreenWakeLock();
+        }
+      });
     });
 
-    // 點擊解鎖防偷掃遮罩 5 秒
+    async function requestScreenWakeLock() {
+      try {
+        if ('wakeLock' in navigator) {
+          wakeLock = await navigator.wakeLock.request('screen');
+        }
+      } catch (err) {
+        console.warn('Wake Lock not supported or blocked:', err);
+      }
+    }
+
+    function lockMasksImmediately() {
+      if (revealTimer) {
+        clearTimeout(revealTimer);
+        revealTimer = null;
+      }
+      const qrMask = document.getElementById('qr-mask');
+      const pinMask = document.getElementById('pin-mask');
+      if (qrMask) qrMask.classList.remove('opacity-0', 'pointer-events-none');
+      if (pinMask) pinMask.classList.remove('opacity-0', 'pointer-events-none');
+    }
+
     function revealCodeTemporarily() {
+      requestScreenWakeLock(); // 趁使用者互動時確保啟用常亮鎖
       const qrMask = document.getElementById('qr-mask');
       const pinMask = document.getElementById('pin-mask');
 
@@ -156,10 +180,8 @@
 
       if (revealTimer) clearTimeout(revealTimer);
 
-      // 5 秒後自動恢復遮蔽保護
       revealTimer = setTimeout(() => {
-        qrMask.classList.remove('opacity-0', 'pointer-events-none');
-        pinMask.classList.remove('opacity-0', 'pointer-events-none');
+        lockMasksImmediately();
       }, 5000);
     }
 
@@ -214,6 +236,7 @@
     }
 
     function changeBooth() {
+      lockMasksImmediately(); // 切換攤位時立即重新遮蔽保護
       currentBooth = document.getElementById('booth-select').value;
       updateBoothTitle();
       countdownSeconds = 180;
