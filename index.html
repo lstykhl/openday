@@ -314,6 +314,7 @@
     let timerInterval = null;
     let currentRedeemType = null;
     let isRedeeming = false;
+    let syncDebounceTimer = null;
 
     let redemptionHistory = JSON.parse(localStorage.getItem('redemption_history')) || [];
     let oldStatus = localStorage.getItem('redemption_status');
@@ -327,29 +328,82 @@
     let pendingMarqueeText = null;
     let isUpdatingMarquee = false;
 
+    // 優先載入本地快取的系統設定與攤位名稱，減輕首頁載入依賴
+    function loadCachedSystemData() {
+      try {
+        const cached = JSON.parse(localStorage.getItem('cached_system_data'));
+        if (cached) {
+          applySystemData(cached, true);
+        }
+      } catch (e) {
+        console.warn("Cache read error:", e);
+      }
+    }
+
+    function applySystemData(data, isFromCache = false) {
+      if (data && data.config) {
+        TOTAL_BOOTHS = data.config.totalBooths || TOTAL_BOOTHS;
+        MIN_STAMPS_SMALL = data.config.minStampsSmall || MIN_STAMPS_SMALL;
+        MIN_STAMPS_MEDIUM = data.config.minStampsMedium || MIN_STAMPS_MEDIUM;
+        MIN_STAMPS_BIG = data.config.minStampsBig || MIN_STAMPS_BIG;
+        MIN_STAMPS_GRAND = data.config.minStampsGrand || MIN_STAMPS_GRAND;
+      }
+
+      if (data && data.marquee) {
+        const fetchedMarquee = String(data.marquee).trim();
+        if (fetchedMarquee !== "" && fetchedMarquee !== currentDisplayedMarquee) {
+          if (currentDisplayedMarquee === "") {
+            safelyUpdateMarquee(fetchedMarquee);
+          } else {
+            pendingMarqueeText = fetchedMarquee;
+          }
+        }
+      }
+
+      if (data && data.booths) boothNames = data.booths;
+      
+      renderBoothGrid();
+      updateProgress();
+
+      if (data && data.workshops && data.workshops.length > 0) {
+        renderWorkshops(data.workshops);
+      } else if (!isFromCache && data && data.workshops) {
+        renderWorkshops([]);
+      }
+    }
+
+    // 帶有隨機抖動 (Jitter) 的 3 分鐘背景輪詢排程，避免 800 人同時整點衝擊後端
+    function scheduleNextBackendFetch() {
+      const baseInterval = 180000; // 3 分鐘
+      const randomJitter = Math.floor(Math.random() * 30000); // 0 ~ 30 秒隨機分散
+      setTimeout(() => {
+        if (localStorage.getItem('needs_sync') === 'true') {
+          syncToBackend(true);
+        }
+        fetchDataFromBackend();
+        scheduleNextBackendFetch();
+      }, baseInterval + randomJitter);
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
       if (!userRole) {
         document.getElementById('role-modal').classList.remove('hidden');
       } else {
         updateRoleBadge();
       }
+
+      loadCachedSystemData();
       renderBoothGrid();
       updateProgress();
       updateFoodButton();
       
       initMarqueeSync();
       fetchDataFromBackend();
-
-      setInterval(() => {
-        if (localStorage.getItem('needs_sync') === 'true') {
-          syncToBackend();
-        }
-        fetchDataFromBackend();
-      }, 60000);
+      scheduleNextBackendFetch();
 
       window.addEventListener('online', () => {
         if (localStorage.getItem('needs_sync') === 'true') {
-          syncToBackend();
+          syncToBackend(true);
         }
       });
     });
@@ -416,38 +470,52 @@
       localStorage.setItem('user_role', role);
       document.getElementById('role-modal').classList.add('hidden');
       updateRoleBadge();
-      syncToBackend();
+      syncToBackend(true); // 選身份立即同步
     }
 
     function updateRoleBadge() { document.getElementById('user-role-badge').innerText = userRole || '訪客'; }
 
-    function syncToBackend() {
+    // 支援防抖合併寫入（連續掃碼延遲 3 秒合併）與重要操作即時寫入（換獎品/換小食）
+    function syncToBackend(immediate = false) {
       localStorage.setItem('needs_sync', 'true');
       if (!GAS_API_URL || GAS_API_URL.includes("YOUR_GOOGLE_APPS_SCRIPT")) return;
-      if (!navigator.onLine) return;
 
-      const prizeTypes = redemptionHistory.map(item => typeof item === 'object' ? item.type : item);
+      if (syncDebounceTimer) {
+        clearTimeout(syncDebounceTimer);
+        syncDebounceTimer = null;
+      }
 
-      const payload = {
-        guestId: guestId,
-        role: userRole,
-        stamps: userStamps,
-        redeemedPrize: prizeTypes.length > 0 ? prizeTypes.join(', ') : "None",
-        redeemedFood: foodRedeemed
+      const executePost = () => {
+        if (!navigator.onLine) return;
+        const prizeTypes = redemptionHistory.map(item => typeof item === 'object' ? item.type : item);
+
+        const payload = {
+          guestId: guestId,
+          role: userRole,
+          stamps: userStamps,
+          redeemedPrize: prizeTypes.length > 0 ? prizeTypes.join(', ') : "None",
+          redeemedFood: foodRedeemed
+        };
+
+        fetch(GAS_API_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(payload)
+        })
+        .then(() => {
+          localStorage.removeItem('needs_sync');
+        })
+        .catch(err => {
+          console.warn("Sync error, will retry later:", err);
+        });
       };
 
-      fetch(GAS_API_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(payload)
-      })
-      .then(() => {
-        localStorage.removeItem('needs_sync');
-      })
-      .catch(err => {
-        console.warn("Sync error, will retry later:", err);
-      });
+      if (immediate) {
+        executePost();
+      } else {
+        syncDebounceTimer = setTimeout(executePost, 3000);
+      }
     }
 
     function fetchDataFromBackend() {
@@ -455,31 +523,12 @@
       fetch(GAS_API_URL)
         .then(res => res.json())
         .then(data => {
-          if (data && data.config) {
-            TOTAL_BOOTHS = data.config.totalBooths || TOTAL_BOOTHS;
-            MIN_STAMPS_SMALL = data.config.minStampsSmall || MIN_STAMPS_SMALL;
-            MIN_STAMPS_MEDIUM = data.config.minStampsMedium || MIN_STAMPS_MEDIUM;
-            MIN_STAMPS_BIG = data.config.minStampsBig || MIN_STAMPS_BIG;
-            MIN_STAMPS_GRAND = data.config.minStampsGrand || MIN_STAMPS_GRAND;
+          if (data) {
+            try {
+              localStorage.setItem('cached_system_data', JSON.stringify(data));
+            } catch (e) {}
+            applySystemData(data, false);
           }
-
-          if (data && data.marquee) {
-            const fetchedMarquee = String(data.marquee).trim();
-            if (fetchedMarquee !== "" && fetchedMarquee !== currentDisplayedMarquee) {
-              if (currentDisplayedMarquee === "") {
-                safelyUpdateMarquee(fetchedMarquee);
-              } else {
-                pendingMarqueeText = fetchedMarquee;
-              }
-            }
-          }
-
-          if (data && data.booths) boothNames = data.booths;
-          
-          renderBoothGrid();
-          updateProgress();
-
-          if (data && data.workshops && data.workshops.length > 0) renderWorkshops(data.workshops);
         }).catch(err => console.warn("Fetch error:", err));
     }
 
@@ -612,7 +661,7 @@
       const redeemedType = currentRedeemType;
       closeRedeemConfirmModal();
       updateProgress();
-      syncToBackend();
+      syncToBackend(true); // 兌換獎品立即寫入後端
 
       let title = '已成功兌換禮物';
       if (redeemedType === 'Small') title = '已成功兌換細獎';
@@ -640,7 +689,7 @@
         localStorage.setItem('user_stamps', JSON.stringify(userStamps));
         renderBoothGrid();
         updateProgress();
-        syncToBackend();
+        syncToBackend(false); // 蓋印採用 3 秒防抖合併寫入，降低高峰併發壓力
         alert(`⚡ 蓋印成功！獲得 ${boothId} 印章！`);
       } else {
         alert(`💡 已收集過 ${boothId} 印章！`);
@@ -779,11 +828,10 @@
       foodRedeemed = true;
       localStorage.setItem('food_redeemed', 'true');
       updateFoodButton();
-      syncToBackend();
+      syncToBackend(true); // 兌換小食立即寫入後端
       startVerificationScreen('已成功兌換小食');
     }
 
-    // 帶有真實兌換時間戳記與 3 分鐘自動失效的動態驗證畫面
     function startVerificationScreen(titleText) {
       const screen = document.getElementById('verification-screen');
       const titleEl = document.getElementById('prize-title');
@@ -792,7 +840,6 @@
       const statusBadge = document.getElementById('verify-status-badge');
       const instructionEl = document.getElementById('verify-instruction');
 
-      // 恢復有效外觀樣式
       screen.classList.remove('bg-slate-400');
       screen.classList.add('animate-neo-flash');
       titleEl.innerText = titleText;
@@ -809,14 +856,13 @@
 
       if (timerInterval) clearInterval(timerInterval);
       
-      const VALID_DURATION_SEC = 180; // 3 分鐘有效期限
+      const VALID_DURATION_SEC = 180;
 
       timerInterval = setInterval(() => {
         const now = new Date();
         const elapsedSec = Math.floor((now.getTime() - startTime) / 1000);
         const remainingSec = Math.max(0, VALID_DURATION_SEC - elapsedSec);
 
-        // 即時更新目前時鐘
         timerDisplay.innerText = now.toTimeString().split(' ')[0];
 
         if (remainingSec > 0) {
@@ -824,7 +870,6 @@
           const secs = (remainingSec % 60).toString().padStart(2, '0');
           statusBadge.innerHTML = `⚡ 有效剩餘：<span class="font-mono">${mins}:${secs}</span> (防截圖)`;
         } else {
-          // 超過 3 分鐘自動轉為過期狀態
           clearInterval(timerInterval);
           screen.classList.remove('animate-neo-flash');
           screen.classList.add('bg-slate-400');
