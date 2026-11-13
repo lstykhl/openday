@@ -752,7 +752,7 @@
       const remain = Math.max(0, available - cost);
 
       document.getElementById('redeem-modal-title').innerText = `確定兌換 ${prizeName} 嗎？`;
-      document.getElementById('redeem-modal-tip').innerHTML = `系統將扣除 <b class="text-neo-red text-base">${cost}</b> 個可用印章。<br>兌換後您還剩下 <b>${remain}</b> 個印章可繼續使用！`;
+      document.getElementById('redeem-modal-tip').innerHTML = `注意：按下確定後，必須於3分鐘內完成兌換！<br><br>系統將扣除 <b class="text-neo-red text-base">${cost}</b> 個可用印章。<br>兌換後您還剩下 <b>${remain}</b> 個印章可繼續使用！`;
       
       document.getElementById('redeem-confirm-modal').classList.remove('hidden');
     }
