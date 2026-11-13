@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>樂善堂楊葛小琳中學開放日 2026 - 電子集章平台</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700;900&display=swap" rel="stylesheet">
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Space Grotesk', 'sans-serif'] },
+          colors: {
+            'neo-bg': '#FFFDF5',
+            'neo-black': '#000000',
+            'neo-red': '#FF6B6B',
+            'neo-yellow': '#FFD93D',
+            'neo-violet': '#C4B5FD',
+          },
+          boxShadow: {
+            'neo-sm': '4px 4px 0px 0px #000000',
+            'neo-md': '6px 6px 0px 0px #000000',
+            'neo-lg': '8px 8px 0px 0px #000000',
+            'neo-xl': '12px 12px 0px 0px #000000',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    @keyframes marquee-smooth {
+      0% { transform: translate3d(0, 0, 0); }
+      100% { transform: translate3d(-50%, 0, 0); }
+    }
+
+    .marquee-container {
+      display: flex;
+      width: max-content;
+      will-change: transform;
+      backface-visibility: hidden;
+      perspective: 1000px;
+      transform: translateZ(0);
+      animation: marquee-smooth var(--marquee-duration, 25s) linear infinite;
+    }
+
+    .marquee-content {
+      display: inline-flex;
+      align-items: center;
+      white-space: nowrap;
+      padding-right: 3rem;
+    }
+
+    body {
+      background-color: #FFFDF5;
+      background-image: radial-gradient(#000000 1.5px, transparent 1.5px);
+      background-size: 24px 24px;
+    }
+    @keyframes neo-flash {
+      0%, 100% { background-color: #FF6B6B; }
+      50% { background-color: #FFD93D; }
+    }
+    .animate-neo-flash { animation: neo-flash 1.5s infinite steps(1); }
+  </style>
+</head>
+<body class="text-neo-black font-sans pb-24 selection:bg-neo-yellow">
+
+  <!-- 置頂無縫跑馬燈 -->
+  <div class="sticky top-0 z-40 bg-neo-yellow border-b-4 border-neo-black py-2.5 overflow-hidden shadow-neo-sm">
+    <div id="marquee-track" class="marquee-container">
+      <div id="marquee-part-1" class="marquee-content font-black text-sm tracking-wide uppercase">
+        ⚡ 歡迎光臨楊中開放日 2026！
+      </div>
+      <div id="marquee-part-2" class="marquee-content font-black text-sm tracking-wide uppercase" aria-hidden="true">
+        ⚡ 歡迎光臨楊中開放日 2026！
+      </div>
+    </div>
+  </div>
+
+  <main class="max-w-md mx-auto p-4 space-y-6">
+
+    <!-- 標頭 Banner -->
+    <header class="bg-neo-violet border-4 border-neo-black p-5 shadow-neo-lg -rotate-1 relative overflow-hidden">
+      <div id="user-role-badge" class="absolute top-2 right-2 z-10 bg-neo-red border-4 border-neo-black px-3 py-1 font-black text-xs text-white uppercase tracking-widest rotate-3 shadow-neo-sm">
+        訪客
+      </div>
+
+      <img 
+        src="https://lunaticarus.github.io/classtools/logo.png" 
+        alt="校徽" 
+        class="absolute right-3 bottom-3 w-16 h-16 object-contain bg-white border-2 border-neo-black p-1 shadow-neo-sm rotate-2"
+      />
+
+      <div class="pr-16">
+        <h1 class="text-3xl font-black uppercase tracking-tight leading-none text-neo-black">
+          楊中開放日<br><span class="bg-neo-yellow px-2 border-2 border-neo-black inline-block mt-1">集章贏大獎</span>
+        </h1>
+        <p class="text-xs font-bold mt-2 text-neo-black/80">提示：全程使用同一瀏覽器，切勿清除快取</p>
+      </div>
+    </header>
+
+    <!-- 集章卡主面板 -->
+    <section class="bg-white border-4 border-neo-black p-5 shadow-neo-lg space-y-4">
+      <div class="flex justify-between items-center border-b-4 border-neo-black pb-3">
+        <h2 class="font-black text-xl uppercase tracking-wide">可用印章數：</h2>
+        <span id="stamp-count" class="font-black text-base bg-neo-yellow border-2 border-neo-black px-3 py-1 shadow-neo-sm">
+          0 / 0 (共 19)
+        </span>
+      </div>
+
+      <div class="w-full bg-slate-100 border-4 border-neo-black h-7 relative overflow-hidden">
+        <div id="progress-bar" class="bg-neo-red h-full w-0 border-r-4 border-neo-black transition-all duration-300"></div>
+      </div>
+
+      <div id="reward-action-area" class="pt-2 space-y-3">
+        <div class="text-[11px] font-bold text-slate-600 text-center">
+          🎁 每種獎項限兌換 1 次，兌換後會扣除相應印章數
+        </div>
+
+        <!-- 4 宮格禮物區 -->
+        <div class="grid grid-cols-2 gap-2.5">
+          <button id="btn-redeem-small" onclick="openRedeemModal('Small')" class="py-3 bg-slate-200 text-slate-400 font-black border-4 border-neo-black shadow-neo-sm uppercase text-sm cursor-not-allowed" disabled>
+            🔒 細獎<br><span class="text-xs font-bold">需 1 印</span>
+          </button>
+          <button id="btn-redeem-medium" onclick="openRedeemModal('Medium')" class="py-3 bg-slate-200 text-slate-400 font-black border-4 border-neo-black shadow-neo-sm uppercase text-sm cursor-not-allowed" disabled>
+            🔒 中獎<br><span class="text-xs font-bold">需 11 印</span>
+          </button>
+          <button id="btn-redeem-big" onclick="openRedeemModal('Big')" class="py-3 bg-slate-200 text-slate-400 font-black border-4 border-neo-black shadow-neo-sm uppercase text-sm cursor-not-allowed" disabled>
+            🔒 大獎<br><span class="text-xs font-bold">需 16 印</span>
+          </button>
+          <button id="btn-redeem-grand" onclick="openRedeemModal('Grand')" class="py-3 bg-slate-200 text-slate-400 font-black border-4 border-neo-black shadow-neo-sm uppercase text-sm cursor-not-allowed" disabled>
+            🔒 特大獎<br><span class="text-xs font-bold">需 19 印</span>
+          </button>
+        </div>
+
+        <button id="btn-redeem-food" onclick="openFoodConfirmModal()" class="w-full py-3 bg-neo-violet hover:bg-violet-300 text-neo-black font-black border-4 border-neo-black shadow-neo-md active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all uppercase tracking-wide cursor-pointer flex items-center justify-center gap-2">
+          🍿 換小食一份 (免費一次)
+        </button>
+      </div>
+    </section>
+
+    <!-- 按鈕組 -->
+    <section class="grid grid-cols-5 gap-3">
+      <button onclick="startScanner()" class="col-span-3 py-4 bg-neo-red hover:bg-neo-red/90 text-white font-black text-lg border-4 border-neo-black shadow-neo-md active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all flex items-center justify-center gap-2 uppercase tracking-wide">
+        📷 開啟鏡頭掃碼
+      </button>
+      <button onclick="openPinModal()" class="col-span-2 py-4 bg-neo-yellow hover:bg-neo-yellow/90 text-neo-black font-black text-base border-4 border-neo-black shadow-neo-md active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all uppercase tracking-wide">
+        🔢 印章動態碼
+      </button>
+    </section>
+
+    <!-- 格子區 (每行 3 格) -->
+    <section class="bg-white border-4 border-neo-black p-5 shadow-neo-lg space-y-3">
+      <div class="flex justify-between items-center border-b-2 border-neo-black pb-2">
+        <h3 class="font-black text-sm uppercase tracking-wider">我的印章卡</h3>
+        <button onclick="openMapModal()" class="text-xs font-black bg-neo-violet hover:bg-violet-300 border-2 border-neo-black px-2.5 py-1 shadow-neo-sm active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all cursor-pointer">
+          🗺️ 檢視地圖
+        </button>
+      </div>
+      <div id="booth-grid" class="grid grid-cols-3 gap-2.5 text-center"></div>
+    </section>
+
+    <!-- 工作坊區塊（智慧時間排序 + 預設顯示前 4 項 + 展開/收起） -->
+    <section class="bg-white border-4 border-neo-black p-5 shadow-neo-lg space-y-3">
+      <div class="flex justify-between items-center border-b-2 border-neo-black pb-2">
+        <h3 class="font-black text-sm uppercase tracking-wider">⚡ 工作坊與活動時間表</h3>
+        <span id="workshop-summary-badge" class="text-[11px] font-black bg-neo-bg border-2 border-neo-black px-2 py-0.5">
+          即時排序
+        </span>
+      </div>
+      <div id="workshop-list" class="space-y-2.5">
+        <div class="p-3 bg-neo-bg border-2 border-neo-black flex justify-between items-center shadow-neo-sm">
+          <div>
+            <div class="font-black text-sm">載入中...</div>
+            <div class="text-xs font-bold text-slate-600">請稍候</div>
+          </div>
+        </div>
+      </div>
+      <button id="btn-toggle-workshops" onclick="toggleWorkshops()" class="hidden w-full py-2.5 bg-neo-yellow hover:bg-yellow-300 text-neo-black font-black text-xs border-2 border-neo-black shadow-neo-sm active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all uppercase tracking-wider cursor-pointer">
+        ▼ 展開全部活動
+      </button>
+    </section>
+
+  </main>
+
+  <!-- 地圖 Modal -->
+  <div id="map-modal" class="fixed inset-0 bg-neo-black/80 hidden z-50 flex items-center justify-center p-4">
+    <div class="bg-white border-4 border-neo-black shadow-neo-xl p-4 w-full max-w-md space-y-3">
+      <div class="flex justify-between items-center border-b-4 border-neo-black pb-2">
+        <h3 class="font-black text-base uppercase">楊中開放日地圖</h3>
+        <button onclick="closeMapModal()" class="font-black text-sm bg-neo-red text-white border-2 border-neo-black px-2 py-0.5">✕ 關閉</button>
+      </div>
+      <div class="border-4 border-neo-black bg-neo-bg overflow-hidden max-h-[70vh] flex items-center justify-center p-1">
+        <img src="map.png" alt="學校地圖" class="w-full h-auto max-h-[65vh] object-contain" />
+      </div>
+    </div>
+  </div>
+
+  <!-- 身份選擇 Modal -->
+  <div id="role-modal" class="fixed inset-0 bg-neo-black/80 hidden z-50 flex items-center justify-center p-4">
+    <div class="bg-white border-4 border-neo-black shadow-neo-xl p-6 w-full max-w-sm space-y-4 text-center">
+      <h2 class="text-2xl font-black uppercase border-b-4 border-neo-black pb-2">歡迎光臨！請選擇身份</h2>
+      <p class="text-xs font-bold text-slate-600">選擇身份以開始參與集章活動：</p>
+      <div class="space-y-2.5 pt-2">
+        <button onclick="selectRole('小學家長/學生')" class="w-full py-3 bg-neo-yellow font-black border-4 border-neo-black shadow-neo-sm hover:bg-yellow-300 active:translate-x-[2px] active:translate-y-[2px] active:shadow-none text-sm uppercase">小學家長/學生</button>
+        <button onclick="selectRole('本校家長')" class="w-full py-3 bg-neo-violet font-black border-4 border-neo-black shadow-neo-sm hover:bg-violet-300 active:translate-x-[2px] active:translate-y-[2px] active:shadow-none text-sm uppercase">本校家長</button>
+        <button onclick="selectRole('本校學生')" class="w-full py-3 bg-neo-red text-white font-black border-4 border-neo-black shadow-neo-sm hover:bg-red-500 active:translate-x-[2px] active:translate-y-[2px] active:shadow-none text-sm uppercase">本校學生</button>
+        <button onclick="selectRole('校友')" class="w-full py-3 bg-white font-black border-4 border-neo-black shadow-neo-sm hover:bg-slate-100 active:translate-x-[2px] active:translate-y-[2px] active:shadow-none text-sm uppercase">校友</button>
+        <button onclick="selectRole('公眾')" class="w-full py-3 bg-slate-200 font-black border-4 border-neo-black shadow-neo-sm hover:bg-slate-300 active:translate-x-[2px] active:translate-y-[2px] active:shadow-none text-sm uppercase">公眾</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 相機掃描 Modal -->
+  <div id="scanner-modal" class="fixed inset-0 bg-neo-black/80 hidden z-50 flex flex-col items-center justify-center p-4">
+    <div class="relative w-full max-w-sm bg-white border-4 border-neo-black shadow-neo-xl p-4 space-y-4">
+      <div class="flex justify-between items-center border-b-4 border-neo-black pb-2">
+        <h3 class="font-black text-base uppercase">相機掃描器</h3>
+        <button onclick="stopScanner()" class="font-black text-sm bg-neo-red text-white border-2 border-neo-black px-2 py-0.5">✕ 關閉</button>
+      </div>
+      <div class="border-4 border-neo-black overflow-hidden relative bg-black">
+        <video id="scanner-video" class="w-full h-64 object-cover" playsinline></video>
+        <canvas id="scanner-canvas" class="hidden"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- 手動印章動態碼 Modal -->
+  <div id="pin-modal" class="fixed inset-0 bg-neo-black/60 hidden z-50 flex items-center justify-center p-4">
+    <div class="bg-white border-4 border-neo-black shadow-neo-xl p-6 w-full max-w-sm space-y-4">
+      <h3 class="font-black text-lg text-center uppercase border-b-4 border-neo-black pb-2">輸入 4 位數印章動態碼</h3>
+      <p class="text-xs font-bold text-center text-slate-600">請向攤位服務生領取印章動態碼</p>
+      <input id="pin-input" type="tel" inputmode="numeric" maxlength="4" placeholder="例如: 8429" class="w-full text-center text-3xl font-black border-4 border-neo-black p-3 bg-neo-yellow focus:bg-white focus:outline-none">
+      <div class="flex gap-2">
+        <button onclick="closePinModal()" class="flex-1 py-3 bg-slate-200 border-4 border-neo-black font-black text-sm uppercase">取消</button>
+        <button onclick="submitPin()" class="flex-1 py-3 bg-neo-red text-white border-4 border-neo-black font-black text-sm uppercase">確認蓋印</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 動態扣印章禮物確認 Modal -->
+  <div id="redeem-confirm-modal" class="fixed inset-0 bg-neo-black/60 hidden z-50 flex items-center justify-center p-4">
+    <div class="bg-white border-4 border-neo-black shadow-neo-xl p-6 w-full max-w-sm space-y-4 text-center">
+      <div class="inline-block bg-neo-yellow border-4 border-neo-black p-3 text-2xl font-black rotate-3">🎁 兌換確認</div>
+      <h3 id="redeem-modal-title" class="font-black text-xl uppercase">確定兌換嗎？</h3>
+      <p id="redeem-modal-tip" class="text-sm font-bold text-slate-700 leading-relaxed border-2 border-neo-black p-4 bg-neo-bg">
+        <!-- 動態文字插入處 -->
+      </p>
+      <div class="space-y-2 pt-2">
+        <button id="btn-redeem-confirm" onclick="confirmRedeem()" class="w-full py-3 bg-neo-red text-white border-4 border-neo-black font-black text-sm shadow-neo-sm uppercase active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all">確定扣除並兌換</button>
+        <button onclick="closeRedeemConfirmModal()" class="w-full py-2.5 bg-slate-200 border-4 border-neo-black font-black text-sm shadow-neo-sm uppercase active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 小食確認 Modal -->
+  <div id="food-confirm-modal" class="fixed inset-0 bg-neo-black/60 hidden z-50 flex items-center justify-center p-4">
+    <div class="bg-white border-4 border-neo-black shadow-neo-xl p-6 w-full max-w-sm space-y-4 text-center">
+      <div class="inline-block bg-neo-violet border-4 border-neo-black p-3 text-2xl font-black rotate-2">🍿 兌換小食</div>
+      <h3 class="font-black text-xl uppercase">確定要兌換小食一份嗎？</h3>
+      <p class="text-xs font-bold text-slate-700 leading-relaxed border-2 border-neo-black p-3 bg-neo-bg">
+        ⚠️ 注意：每人限免費領取一次小食，不扣除印章。請在攤位工作人員面前確認點擊！
+      </p>
+      <div class="space-y-2 pt-2">
+        <button onclick="triggerRedeemFood()" class="w-full py-3 bg-neo-red text-white border-4 border-neo-black font-black text-sm shadow-neo-sm uppercase active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all">確定兌換小食</button>
+        <button onclick="closeFoodConfirmModal()" class="w-full py-2.5 bg-slate-200 border-4 border-neo-black font-black text-sm shadow-neo-sm uppercase active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 全螢幕動態驗證頁面 (含真實兌換時間戳記與 3 分鐘自動失效) -->
+  <div id="verification-screen" class="fixed inset-0 animate-neo-flash hidden z-50 flex flex-col items-center justify-between p-6 text-center text-neo-black">
+    <div class="space-y-2 pt-4">
+      <span class="bg-white border-4 border-neo-black font-black text-xs px-4 py-1.5 shadow-neo-md uppercase tracking-widest">楊中開放日 2026 官方憑證</span>
+      <h2 id="prize-title" class="text-3xl font-black uppercase tracking-tight bg-neo-yellow border-4 border-neo-black p-3 shadow-neo-lg rotate-1">已成功兌換禮物</h2>
+    </div>
+
+    <div class="bg-white border-8 border-neo-black p-5 shadow-neo-xl w-full max-w-xs space-y-3 -rotate-1">
+      <div id="verify-instruction" class="text-xs font-black uppercase tracking-wider text-slate-600">請即時出示此畫面給工作人員</div>
+      
+      <div class="bg-neo-bg border-2 border-neo-black py-1.5 px-2">
+        <div class="text-[11px] font-bold text-slate-500 uppercase">兌換時間</div>
+        <div id="redeemed-timestamp" class="text-xl font-black font-mono text-neo-red">--:--:--</div>
+      </div>
+
+      <div>
+        <div class="text-[11px] font-bold text-slate-500 uppercase mb-1">目前即時時間</div>
+        <div id="timer-display" class="text-4xl font-black font-mono tracking-wider bg-neo-violet border-4 border-neo-black p-2">--:--:--</div>
+      </div>
+
+      <div id="verify-status-badge" class="text-xs font-black bg-neo-yellow border-2 border-neo-black py-1.5 px-2">
+        ⚡ 有效剩餘：<span id="verify-countdown" class="font-mono">03:00</span> (防截圖)
+      </div>
+    </div>
+
+    <div class="pb-4 w-full max-w-xs">
+      <button onclick="closeVerificationScreen()" class="w-full py-4 bg-white border-4 border-neo-black font-black text-base shadow-neo-md uppercase active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all">返回主頁面</button>
+    </div>
+  </div>
+
+  <script>
+    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzA4Iuflm5N6faXsrUXPQ8Q68VNfcDysS_3ru281wLymPPxzt92fliq2k7Of0pIdCBcHw/exec";
+    
+    let TOTAL_BOOTHS = 19;
+    let MIN_STAMPS_SMALL = 1;
+    let MIN_STAMPS_MEDIUM = 11;
+    let MIN_STAMPS_BIG = 16;
+    let MIN_STAMPS_GRAND = 19;
+
+    let guestId = localStorage.getItem('guest_id');
+    if (!guestId) {
+      guestId = 'visitor_' + Math.random().toString(36).substr(2, 9);
+      localStorage.setItem('guest_id', guestId);
+    }
+    let userRole = localStorage.getItem('user_role') || '';
+    let userStamps = JSON.parse(localStorage.getItem('user_stamps')) || [];
+    let foodRedeemed = localStorage.getItem('food_redeemed') === 'true';
+    let boothNames = {};
+    let timerInterval = null;
+    let currentRedeemType = null;
+    let isRedeeming = false;
+    let syncDebounceTimer = null;
+
+    // 工作坊狀態管理
+    let allWorkshopsData = [];
+    let isWorkshopsExpanded = false;
+    const WORKSHOPS_COLLAPSED_LIMIT = 4;
+
+    let redemptionHistory = JSON.parse(localStorage.getItem('redemption_history')) || [];
+    let oldStatus = localStorage.getItem('redemption_status');
+    if (oldStatus && oldStatus !== 'None' && redemptionHistory.length === 0) {
+      redemptionHistory = [oldStatus];
+      localStorage.setItem('redemption_history', JSON.stringify(redemptionHistory));
+      localStorage.removeItem('redemption_status');
+    }
+
+    let currentDisplayedMarquee = "";
+    let pendingMarqueeText = null;
+    let isUpdatingMarquee = false;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      if (!userRole) {
+        document.getElementById('role-modal').classList.remove('hidden');
+      } else {
+        updateRoleBadge();
+      }
+
+      const hasCache = loadCachedBackendData();
+      if (!hasCache) {
+        renderBoothGrid();
+        updateProgress();
+      }
+      updateFoodButton();
+      
+      initMarqueeSync();
+      fetchDataFromBackend();
+
+      scheduleNextPoll();
+
+      // 每分鐘自動重新評估工作坊「進行中 / 即將開始 / 已結束」狀態並重新排序
+      setInterval(() => {
+        if (allWorkshopsData.length > 0) {
+          renderWorkshops(allWorkshopsData);
+        }
+      }, 60000);
+
+      // 頁面隱藏或切換 App 時，若有尚在防抖倒數的同步請求，立即沖刷送出
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden && syncDebounceTimer !== null) {
+          clearTimeout(syncDebounceTimer);
+          syncDebounceTimer = null;
+          executeBackendPost();
+        }
+      });
+
+      window.addEventListener('online', () => {
+        if (localStorage.getItem('needs_sync') === 'true') {
+          syncToBackend(true);
+        }
+      });
+    });
+
+    function scheduleNextPoll() {
+      const jitterMs = 180000 + Math.floor(Math.random() * 30000);
+      setTimeout(() => {
+        if (localStorage.getItem('needs_sync') === 'true') {
+          syncToBackend(true);
+        }
+        fetchDataFromBackend();
+        scheduleNextPoll();
+      }, jitterMs);
+    }
+
+    function loadCachedBackendData() {
+      try {
+        const cached = JSON.parse(localStorage.getItem('cached_backend_data'));
+        if (cached) {
+          applyBackendPayload(cached);
+          return true;
+        }
+      } catch (e) {}
+      return false;
+    }
+
+    function applyBackendPayload(data) {
+      if (data && data.config) {
+        TOTAL_BOOTHS = data.config.totalBooths || TOTAL_BOOTHS;
+        MIN_STAMPS_SMALL = data.config.minStampsSmall || MIN_STAMPS_SMALL;
+        MIN_STAMPS_MEDIUM = data.config.minStampsMedium || MIN_STAMPS_MEDIUM;
+        MIN_STAMPS_BIG = data.config.minStampsBig || MIN_STAMPS_BIG;
+        MIN_STAMPS_GRAND = data.config.minStampsGrand || MIN_STAMPS_GRAND;
+      }
+
+      if (data && data.marquee) {
+        const fetchedMarquee = String(data.marquee).trim();
+        if (fetchedMarquee !== "" && fetchedMarquee !== currentDisplayedMarquee) {
+          if (currentDisplayedMarquee === "") {
+            safelyUpdateMarquee(fetchedMarquee);
+          } else {
+            pendingMarqueeText = fetchedMarquee;
+          }
+        }
+      }
+
+      if (data && data.booths) boothNames = data.booths;
+      
+      renderBoothGrid();
+      updateProgress();
+
+      if (data && data.workshops) {
+        allWorkshopsData = data.workshops;
+        renderWorkshops(allWorkshopsData);
+      }
+    }
+
+    function openMapModal() { document.getElementById('map-modal').classList.remove('hidden'); }
+    function closeMapModal() { document.getElementById('map-modal').classList.add('hidden'); }
+
+    function initMarqueeSync() {
+      const track = document.getElementById('marquee-track');
+      if (!track) return;
+
+      track.addEventListener('animationiteration', () => {
+        if (pendingMarqueeText !== null && !isUpdatingMarquee) {
+          safelyUpdateMarquee(pendingMarqueeText);
+          pendingMarqueeText = null;
+        }
+      });
+    }
+
+    function calculateMarqueeDuration(formattedText) {
+      const charCount = formattedText.length;
+      return Math.max(15, Math.round(12 + (charCount * 0.45)));
+    }
+
+    function safelyUpdateMarquee(text) {
+      if (!text || typeof text !== 'string') return;
+      const cleanText = text.trim();
+      if (cleanText === "" || cleanText === currentDisplayedMarquee) return;
+
+      isUpdatingMarquee = true;
+      currentDisplayedMarquee = cleanText;
+
+      const formattedText = cleanText.startsWith("⚡") ? cleanText : "⚡ " + cleanText;
+      const dynamicDuration = calculateMarqueeDuration(formattedText);
+
+      const part1 = document.getElementById('marquee-part-1');
+      const part2 = document.getElementById('marquee-part-2');
+      const track = document.getElementById('marquee-track');
+
+      if (part1 && part2 && track) {
+        requestAnimationFrame(() => {
+          part1.innerText = formattedText;
+          part2.innerText = formattedText;
+          track.style.setProperty('--marquee-duration', dynamicDuration + 's');
+
+          setTimeout(() => {
+            isUpdatingMarquee = false;
+          }, 100);
+        });
+      } else {
+        isUpdatingMarquee = false;
+      }
+    }
+
+    function selectRole(role) {
+      userRole = role;
+      localStorage.setItem('user_role', role);
+      document.getElementById('role-modal').classList.add('hidden');
+      updateRoleBadge();
+      syncToBackend(false);
+    }
+
+    function updateRoleBadge() { document.getElementById('user-role-badge').innerText = userRole || '訪客'; }
+
+    function syncToBackend(immediate = false) {
+      localStorage.setItem('needs_sync', 'true');
+      if (!GAS_API_URL || GAS_API_URL.includes("YOUR_GOOGLE_APPS_SCRIPT")) return;
+      if (!navigator.onLine) return;
+
+      if (syncDebounceTimer) {
+        clearTimeout(syncDebounceTimer);
+        syncDebounceTimer = null;
+      }
+
+      if (!immediate) {
+        syncDebounceTimer = setTimeout(() => {
+          syncDebounceTimer = null;
+          executeBackendPost();
+        }, 3000);
+      } else {
+        executeBackendPost();
+      }
+    }
+
+    function executeBackendPost() {
+      const prizeTypes = redemptionHistory.map(item => typeof item === 'object' ? item.type : item);
+
+      const payload = {
+        guestId: guestId,
+        role: userRole,
+        stamps: userStamps,
+        redeemedPrize: prizeTypes.length > 0 ? prizeTypes.join(', ') : "None",
+        redeemedFood: foodRedeemed
+      };
+
+      fetch(GAS_API_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload)
+      })
+      .then(() => {
+        localStorage.removeItem('needs_sync');
+      })
+      .catch(err => {
+        console.warn("Sync error, will retry later:", err);
+      });
+    }
+
+    function fetchDataFromBackend() {
+      if (!GAS_API_URL || GAS_API_URL.includes("YOUR_GOOGLE_APPS_SCRIPT")) return;
+      fetch(GAS_API_URL)
+        .then(res => res.json())
+        .then(data => {
+          if (data) {
+            localStorage.setItem('cached_backend_data', JSON.stringify(data));
+            applyBackendPayload(data);
+          }
+        }).catch(err => console.warn("Fetch error:", err));
+    }
+
+    function renderBoothGrid() {
+      const grid = document.getElementById('booth-grid');
+      grid.innerHTML = '';
+      for (let i = 1; i <= TOTAL_BOOTHS; i++) {
+        const boothId = 'B' + i.toString().padStart(2, '0');
+        const isStamped = userStamps.includes(boothId);
+        const name = boothNames[boothId] || boothId;
+        
+        const card = document.createElement('div');
+        card.className = "relative p-2.5 border-4 border-neo-black min-h-[76px] flex items-center justify-center text-center shadow-neo-sm transition-all overflow-hidden " + 
+          (isStamped ? "bg-neo-yellow text-neo-black rotate-1" : "bg-white text-slate-700");
+        
+        const starBg = isStamped 
+          ? '<div class="absolute inset-0 flex items-center justify-center opacity-15 pointer-events-none select-none text-neo-black text-6xl font-black">★</div>'
+          : '<div class="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none select-none text-slate-300 text-5xl font-black">☆</div>';
+        const textContent = '<span class="relative z-10 font-black text-xs leading-tight tracking-tight break-words max-w-full px-0.5">' + name + '</span>';
+        card.innerHTML = starBg + textContent;
+        grid.appendChild(card);
+      }
+    }
+
+    function parseWorkshopTimeRange(timeStr) {
+      const match = String(timeStr).match(/(\d{1,2}):(\d{2})\s*[-–~至]\s*(\d{1,2}):(\d{2})/);
+      if (!match) {
+        return { startMins: 9999, endMins: 9999, status: 'upcoming' };
+      }
+      const startMins = parseInt(match[1], 10) * 60 + parseInt(match[2], 10);
+      const endMins = parseInt(match[3], 10) * 60 + parseInt(match[4], 10);
+
+      const now = new Date();
+      const nowMins = now.getHours() * 60 + now.getMinutes();
+
+      let status = 'upcoming';
+      if (nowMins >= startMins && nowMins < endMins) {
+        status = 'live';
+      } else if (nowMins >= endMins) {
+        status = 'ended';
+      }
+      return { startMins, endMins, status };
+    }
+
+    function toggleWorkshops() {
+      isWorkshopsExpanded = !isWorkshopsExpanded;
+      renderWorkshops(allWorkshopsData);
+    }
+
+    function renderWorkshops(list) {
+      const container = document.getElementById('workshop-list');
+      const toggleBtn = document.getElementById('btn-toggle-workshops');
+      const summaryBadge = document.getElementById('workshop-summary-badge');
+      container.innerHTML = '';
+
+      if (!list || list.length === 0) {
+        toggleBtn.classList.add('hidden');
+        summaryBadge.innerText = '共 0 項';
+        container.innerHTML = 
+          '<div class="p-3 bg-neo-bg border-2 border-neo-black text-center shadow-neo-sm">' +
+            '<div class="font-bold text-xs text-slate-500">目前沒有進行中的工作坊與活動</div>' +
+          '</div>';
+        return;
+      }
+
+      const statusPriority = { live: 0, upcoming: 1, ended: 2 };
+      const enriched = list.map((item, idx) => {
+        const parsed = parseWorkshopTimeRange(item.time);
+        return { ...item, ...parsed, originalIndex: idx };
+      }).sort((a, b) => {
+        if (statusPriority[a.status] !== statusPriority[b.status]) {
+          return statusPriority[a.status] - statusPriority[b.status];
+        }
+        if (a.startMins !== b.startMins) {
+          return a.startMins - b.startMins;
+        }
+        return a.originalIndex - b.originalIndex;
+      });
+
+      const activeCount = enriched.filter(w => w.status !== 'ended').length;
+      summaryBadge.innerText = activeCount > 0 ? `尚有 ${activeCount} 場可參加` : `共 ${enriched.length} 場`;
+
+      const visibleItems = isWorkshopsExpanded 
+        ? enriched 
+        : enriched.slice(0, WORKSHOPS_COLLAPSED_LIMIT);
+
+      visibleItems.forEach(item => {
+        const row = document.createElement('div');
+        
+        if (item.status === 'live') {
+          row.className = "p-3 bg-neo-yellow/30 border-2 border-neo-black flex justify-between items-center gap-2 shadow-neo-sm";
+          row.innerHTML = `
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="bg-neo-red text-white border border-neo-black font-black text-[10px] px-1.5 py-0.5 uppercase tracking-wider shrink-0">● 進行中</span>
+                <span class="font-black text-sm text-neo-black break-words">${item.title}</span>
+              </div>
+              <div class="text-xs font-bold text-slate-700 mt-0.5">地點：${item.location}</div>
+            </div>
+            <span class="bg-neo-yellow border-2 border-neo-black font-black text-xs px-2 py-1 shrink-0 font-mono">${item.time}</span>
+          `;
+        } else if (item.status === 'ended') {
+          row.className = "p-3 bg-slate-100 border-2 border-slate-400 flex justify-between items-center gap-2 opacity-65";
+          row.innerHTML = `
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="bg-slate-300 text-slate-700 border border-slate-500 font-black text-[10px] px-1.5 py-0.5 shrink-0">已結束</span>
+                <span class="font-bold text-sm text-slate-600 line-through break-words">${item.title}</span>
+              </div>
+              <div class="text-xs font-bold text-slate-500 mt-0.5">地點：${item.location}</div>
+            </div>
+            <span class="bg-slate-200 text-slate-600 border border-slate-400 font-bold text-xs px-2 py-1 shrink-0 font-mono">${item.time}</span>
+          `;
+        } else {
+          row.className = "p-3 bg-neo-bg border-2 border-neo-black flex justify-between items-center gap-2 shadow-neo-sm";
+          row.innerHTML = `
+            <div class="min-w-0 flex-1">
+              <div class="font-black text-sm text-neo-black break-words">${item.title}</div>
+              <div class="text-xs font-bold text-slate-600 mt-0.5">地點：${item.location}</div>
+            </div>
+            <span class="bg-neo-yellow border border-neo-black font-black text-xs px-2 py-1 shrink-0 font-mono">${item.time}</span>
+          `;
+        }
+        container.appendChild(row);
+      });
+
+      if (enriched.length > WORKSHOPS_COLLAPSED_LIMIT) {
+        toggleBtn.classList.remove('hidden');
+        if (isWorkshopsExpanded) {
+          toggleBtn.innerText = `▲ 收起部分活動 (僅顯示前 ${WORKSHOPS_COLLAPSED_LIMIT} 項)`;
+          toggleBtn.className = "w-full py-2.5 bg-slate-200 hover:bg-slate-300 text-neo-black font-black text-xs border-2 border-neo-black shadow-neo-sm active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all uppercase tracking-wider cursor-pointer";
+        } else {
+          const hiddenCount = enriched.length - WORKSHOPS_COLLAPSED_LIMIT;
+          toggleBtn.innerText = `▼ 查看全部活動 (還有 ${hiddenCount} 項)`;
+          toggleBtn.className = "w-full py-2.5 bg-neo-yellow hover:bg-yellow-300 text-neo-black font-black text-xs border-2 border-neo-black shadow-neo-sm active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all uppercase tracking-wider cursor-pointer";
+        }
+      } else {
+        toggleBtn.classList.add('hidden');
+      }
+    }
+
+    function getCostByType(type) {
+      if (type === 'Small') return MIN_STAMPS_SMALL;
+      if (type === 'Medium') return MIN_STAMPS_MEDIUM;
+      if (type === 'Big') return MIN_STAMPS_BIG;
+      if (type === 'Grand') return MIN_STAMPS_GRAND;
+      return 0;
+    }
+
+    function hasRedeemedType(type) {
+      return redemptionHistory.some(item => {
+        const itemType = (typeof item === 'object' && item !== null) ? item.type : item;
+        return itemType === type;
+      });
+    }
+
+    function getSpentStamps() {
+      let spent = 0;
+      redemptionHistory.forEach(item => {
+        if (typeof item === 'object' && item !== null && typeof item.cost === 'number') {
+          spent += item.cost;
+        } else {
+          spent += getCostByType(item);
+        }
+      });
+      return spent;
+    }
+
+    function updateProgress() {
+      const totalStamps = userStamps.length;
+      const spentStamps = getSpentStamps();
+      const availableStamps = Math.max(0, totalStamps - spentStamps);
+
+      document.getElementById('stamp-count').innerText = `${availableStamps} / 總共集齊 ${totalStamps}`;
+      document.getElementById('progress-bar').style.width = Math.min(100, ((totalStamps / TOTAL_BOOTHS) * 100)) + '%';
+
+      updatePrizeButton('Small', 'small', '細獎', availableStamps, MIN_STAMPS_SMALL, 'bg-emerald-400', 'text-neo-black');
+      updatePrizeButton('Medium', 'medium', '中獎', availableStamps, MIN_STAMPS_MEDIUM, 'bg-neo-yellow', 'text-neo-black');
+      updatePrizeButton('Big', 'big', '大獎', availableStamps, MIN_STAMPS_BIG, 'bg-orange-400', 'text-white');
+      updatePrizeButton('Grand', 'grand', '特大獎', availableStamps, MIN_STAMPS_GRAND, 'bg-neo-red', 'text-white');
+    }
+
+    function updatePrizeButton(typeKey, idPart, name, available, cost, bgActive, textActive) {
+      const btn = document.getElementById(`btn-redeem-${idPart}`);
+      const alreadyRedeemed = hasRedeemedType(typeKey);
+
+      if (alreadyRedeemed) {
+        btn.disabled = true;
+        btn.className = "py-3 bg-slate-200 text-slate-500 font-black border-4 border-neo-black shadow-neo-sm uppercase cursor-not-allowed";
+        btn.innerHTML = `✅ 已兌換${name}<br><span class="text-xs">每項限換 1 次</span>`;
+      } else if (available >= cost) {
+        btn.disabled = false;
+        btn.className = `py-3 ${bgActive} ${textActive} font-black border-4 border-neo-black shadow-neo-sm active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all uppercase cursor-pointer`;
+        btn.innerHTML = `🎁 換${name}<br><span class="text-xs">扣除 ${cost} 印</span>`;
+      } else {
+        btn.disabled = true;
+        btn.className = "py-3 bg-slate-200 text-slate-400 font-black border-4 border-neo-black shadow-neo-sm uppercase cursor-not-allowed";
+        btn.innerHTML = `🔒 ${name}<br><span class="text-xs">需 ${cost} 印</span>`;
+      }
+    }
+
+    function openRedeemModal(type) {
+      if (hasRedeemedType(type)) {
+        alert("您已經兌換過此獎項，每種獎項限兌換 1 次！");
+        return;
+      }
+
+      currentRedeemType = type;
+      isRedeeming = false;
+      const confirmBtn = document.getElementById('btn-redeem-confirm');
+      if (confirmBtn) confirmBtn.disabled = false;
+
+      let prizeName = '';
+      if (type === 'Small') prizeName = '細獎';
+      else if (type === 'Medium') prizeName = '中獎';
+      else if (type === 'Big') prizeName = '大獎';
+      else if (type === 'Grand') prizeName = '特大獎';
+
+      const cost = getCostByType(type);
+      const available = Math.max(0, userStamps.length - getSpentStamps());
+      const remain = Math.max(0, available - cost);
+
+      document.getElementById('redeem-modal-title').innerText = `確定兌換 ${prizeName} 嗎？`;
+      document.getElementById('redeem-modal-tip').innerHTML = `系統將扣除 <b class="text-neo-red text-base">${cost}</b> 個可用印章（每種獎項限換 1 次）。<br>兌換後您還剩下 <b>${remain}</b> 個印章可兌換其他獎項！`;
+      
+      document.getElementById('redeem-confirm-modal').classList.remove('hidden');
+    }
+
+    function confirmRedeem() {
+      if (!currentRedeemType || isRedeeming) return;
+
+      if (hasRedeemedType(currentRedeemType)) {
+        alert("您已經兌換過此獎項，每種獎項限兌換 1 次！");
+        closeRedeemConfirmModal();
+        return;
+      }
+      
+      const cost = getCostByType(currentRedeemType);
+      const available = userStamps.length - getSpentStamps();
+      if (available < cost) {
+        alert("可用印章不足！");
+        closeRedeemConfirmModal();
+        return;
+      }
+
+      isRedeeming = true;
+      const confirmBtn = document.getElementById('btn-redeem-confirm');
+      if (confirmBtn) confirmBtn.disabled = true;
+
+      redemptionHistory.push({ type: currentRedeemType, cost: cost });
+      localStorage.setItem('redemption_history', JSON.stringify(redemptionHistory));
+      
+      const redeemedType = currentRedeemType;
+      closeRedeemConfirmModal();
+      updateProgress();
+      syncToBackend(true);
+
+      let title = '已成功兌換禮物';
+      if (redeemedType === 'Small') title = '已成功兌換細獎';
+      if (redeemedType === 'Medium') title = '已成功兌換中獎';
+      if (redeemedType === 'Big') title = '已成功兌換大獎';
+      if (redeemedType === 'Grand') title = '已成功兌換特大獎';
+      
+      isRedeeming = false;
+      startVerificationScreen(title);
+    }
+
+    function updateFoodButton() {
+      const btnFood = document.getElementById('btn-redeem-food');
+      if (foodRedeemed) {
+        btnFood.disabled = true;
+        btnFood.onclick = null;
+        btnFood.className = "w-full py-3 bg-slate-200 text-slate-500 font-black border-4 border-neo-black shadow-neo-sm uppercase cursor-not-allowed flex items-center justify-center gap-2";
+        btnFood.innerText = "🔒 已成功領取小食";
+      }
+    }
+
+    function addStamp(boothId) {
+      if (!userStamps.includes(boothId)) {
+        userStamps.push(boothId);
+        localStorage.setItem('user_stamps', JSON.stringify(userStamps));
+        renderBoothGrid();
+        updateProgress();
+        syncToBackend(false);
+        alert(`⚡ 蓋印成功！獲得 ${boothId} 印章！`);
+      } else {
+        alert(`💡 已收集過 ${boothId} 印章！`);
+      }
+    }
+
+    let videoStream = null;
+    let animationFrameId = null;
+
+    function startScanner() {
+      stopScanner();
+      document.getElementById('scanner-modal').classList.remove('hidden');
+      const video = document.getElementById('scanner-video');
+      navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          facingMode: "environment",
+          width: { ideal: 640 },
+          height: { ideal: 480 }
+        } 
+      })
+        .then(stream => {
+          videoStream = stream;
+          video.srcObject = stream;
+          video.setAttribute("playsinline", true);
+          video.play();
+          animationFrameId = requestAnimationFrame(scanQRCode);
+        })
+        .catch(() => {
+          alert("無法打開相機，請使用「印章動態碼」。");
+          stopScanner();
+        });
+    }
+
+    function stopScanner() {
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+      }
+      const video = document.getElementById('scanner-video');
+      if (video) {
+        video.srcObject = null;
+      }
+      if (videoStream) {
+        videoStream.getTracks().forEach(track => track.stop());
+        videoStream = null;
+      }
+      document.getElementById('scanner-modal').classList.add('hidden');
+    }
+
+    function scanQRCode() {
+      if (document.getElementById('scanner-modal').classList.contains('hidden')) return;
+
+      const video = document.getElementById('scanner-video');
+      const canvas = document.getElementById('scanner-canvas');
+      if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        canvas.height = video.videoHeight;
+        canvas.width = video.videoWidth;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+        if (code) {
+          stopScanner();
+          handleScannedData(code.data);
+          return;
+        }
+      }
+      animationFrameId = requestAnimationFrame(scanQRCode);
+    }
+
+    function handleScannedData(data) {
+      if (data.startsWith("booth:")) {
+        const parts = data.split(":");
+        const boothId = parts[1];
+        if (parts.length >= 4 && parts[2] === "t") {
+          const qrTimeBlock = parseInt(parts[3]);
+          const currentBlock = Math.floor(Date.now() / (1000 * 180));
+          if (Math.abs(currentBlock - qrTimeBlock) <= 1) {
+            addStamp(boothId);
+          } else {
+            alert("⚠️ 此 QR Code 已過期！\n1. 請掃描攤位 iPad 最新顯示的動態碼（切勿使用舊截圖）\n2. 若為現場掃描，請確認手機已開啟「自動設定日期與時間」");
+          }
+        } else {
+          alert("⚠️ 無效或過期的 QR Code 格式！");
+        }
+      } else {
+        alert("⚠️ 無效的 QR Code！");
+      }
+    }
+
+    function openPinModal() { document.getElementById('pin-modal').classList.remove('hidden'); }
+    function closePinModal() { document.getElementById('pin-modal').classList.add('hidden'); }
+    
+    function generateDynamicPin(boothNum, timeBlock) {
+      const SALT = 20261013;
+      let hash = (boothNum * 9301 + timeBlock * 49297 + SALT) % 233280;
+      hash = (hash * 9301 + 49297) % 233280;
+      return 1000 + (Math.abs(hash) % 9000);
+    }
+
+    function submitPin() {
+      const pin = parseInt(document.getElementById('pin-input').value, 10);
+      if (isNaN(pin) || pin < 1000) {
+        alert("請輸入有效的印章動態碼！");
+        return;
+      }
+      const currentBlock = Math.floor(Date.now() / (1000 * 180));
+      let matchedBooth = null;
+      for (let i = 1; i <= TOTAL_BOOTHS; i++) {
+        for (let offset = -1; offset <= 1; offset++) {
+          const targetBlock = currentBlock + offset;
+          const validCode = generateDynamicPin(i, targetBlock);
+          if (pin === validCode) {
+            matchedBooth = 'B' + i.toString().padStart(2, '0');
+            break;
+          }
+        }
+        if (matchedBooth) break;
+      }
+      if (matchedBooth) {
+        addStamp(matchedBooth);
+        closePinModal();
+        document.getElementById('pin-input').value = '';
+      } else {
+        alert("印章動態碼無效或已過期，請向攤位服務生領取最新印章動態碼！（若剛領取仍失敗，請檢查手機時間是否準確）");
+      }
+    }
+
+    function openFoodConfirmModal() { document.getElementById('food-confirm-modal').classList.remove('hidden'); }
+    function closeFoodConfirmModal() { document.getElementById('food-confirm-modal').classList.add('hidden'); }
+
+    function triggerRedeemFood() {
+      if (foodRedeemed) return;
+      closeFoodConfirmModal();
+      foodRedeemed = true;
+      localStorage.setItem('food_redeemed', 'true');
+      updateFoodButton();
+      syncToBackend(true);
+      startVerificationScreen('已成功兌換小食');
+    }
+
+    function startVerificationScreen(titleText) {
+      const screen = document.getElementById('verification-screen');
+      const titleEl = document.getElementById('prize-title');
+      const redeemedTimeEl = document.getElementById('redeemed-timestamp');
+      const timerDisplay = document.getElementById('timer-display');
+      const statusBadge = document.getElementById('verify-status-badge');
+      const instructionEl = document.getElementById('verify-instruction');
+
+      screen.classList.remove('bg-slate-400');
+      screen.classList.add('animate-neo-flash');
+      titleEl.innerText = titleText;
+      titleEl.className = "text-3xl font-black uppercase tracking-tight bg-neo-yellow border-4 border-neo-black p-3 shadow-neo-lg rotate-1";
+      instructionEl.innerText = "請即時出示此畫面給工作人員";
+      statusBadge.className = "text-xs font-black bg-neo-yellow border-2 border-neo-black py-1.5 px-2";
+
+      const startTime = Date.now();
+      const startDate = new Date(startTime);
+      redeemedTimeEl.innerText = startDate.toTimeString().split(' ')[0];
+      timerDisplay.innerText = startDate.toTimeString().split(' ')[0];
+
+      screen.classList.remove('hidden');
+
+      if (timerInterval) clearInterval(timerInterval);
+      
+      const VALID_DURATION_SEC = 180;
+
+      timerInterval = setInterval(() => {
+        const now = new Date();
+        const elapsedSec = Math.floor((now.getTime() - startTime) / 1000);
+        const remainingSec = Math.max(0, VALID_DURATION_SEC - elapsedSec);
+
+        timerDisplay.innerText = now.toTimeString().split(' ')[0];
+
+        if (remainingSec > 0) {
+          const mins = Math.floor(remainingSec / 60).toString().padStart(2, '0');
+          const secs = (remainingSec % 60).toString().padStart(2, '0');
+          statusBadge.innerHTML = `⚡ 有效剩餘：<span class="font-mono">${mins}:${secs}</span> (防截圖)`;
+        } else {
+          clearInterval(timerInterval);
+          screen.classList.remove('animate-neo-flash');
+          screen.classList.add('bg-slate-400');
+          titleEl.innerText = "憑證已過期";
+          titleEl.className = "text-3xl font-black uppercase tracking-tight bg-slate-200 text-slate-500 border-4 border-neo-black p-3 shadow-neo-lg";
+          instructionEl.innerText = "此兌換畫面已超過 3 分鐘有效期限";
+          statusBadge.className = "text-xs font-black bg-neo-red text-white border-2 border-neo-black py-1.5 px-2";
+          statusBadge.innerText = "⚠️ 已逾時失效 (請按下方返回)";
+        }
+      }, 1000);
+    }
+
+    function closeRedeemConfirmModal() { 
+      isRedeeming = false;
+      document.getElementById('redeem-confirm-modal').classList.add('hidden'); 
+    }
+
+    function closeVerificationScreen() {
+      const isConfirmed = confirm("⚠️ 確定已向工作人員出示並完成領取嗎？\n\n返回主頁面後，此動態驗證憑證將會關閉。");
+      if (!isConfirmed) return;
+
+      if (timerInterval) clearInterval(timerInterval);
+      document.getElementById('verification-screen').classList.add('hidden');
+    }
+  </script>
+</body>
+</html>
