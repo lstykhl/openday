@@ -126,7 +126,13 @@
 
   <script>
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzA4Iuflm5N6faXsrUXPQ8Q68VNfcDysS_3ru281wLymPPxzt92fliq2k7Of0pIdCBcHw/exec";
-    let currentBooth = "B01";
+    
+    // 支援網址參數 (?booth=B05) 或記憶上次選擇的攤位，避免誤按重整跳回 B01
+    const urlBooth = new URLSearchParams(window.location.search).get('booth');
+    let currentBooth = (urlBooth && /^B\d{2}$/i.test(urlBooth))
+      ? urlBooth.toUpperCase()
+      : (localStorage.getItem('selected_booth') || "B01");
+
     let qrcodeInstance = null;
     let boothMap = {};
     let totalBooths = 19;
@@ -135,6 +141,7 @@
     let lastRenderedBlock = -1;
 
     document.addEventListener('DOMContentLoaded', () => {
+      loadCachedBoothData();
       initBoothSelect();
       fetchBackendData();
       syncWithSystemClock();
@@ -144,10 +151,20 @@
       document.addEventListener('visibilitychange', () => {
         if (!document.hidden) {
           requestScreenWakeLock();
-          syncWithSystemClock(); // 喚醒 iPad 瞬間立即同步最新時間區塊
+          syncWithSystemClock();
         }
       });
     });
+
+    function loadCachedBoothData() {
+      try {
+        const cached = JSON.parse(localStorage.getItem('cached_booth_meta'));
+        if (cached) {
+          if (cached.totalBooths) totalBooths = cached.totalBooths;
+          if (cached.booths) boothMap = cached.booths;
+        }
+      } catch (e) {}
+    }
 
     async function requestScreenWakeLock() {
       try {
@@ -220,6 +237,10 @@
             updated = true;
           }
           if (updated) {
+            localStorage.setItem('cached_booth_meta', JSON.stringify({
+              totalBooths: totalBooths,
+              booths: boothMap
+            }));
             initBoothSelect();
           }
         }).catch(err => console.warn("Fetch backend error:", err));
@@ -238,8 +259,9 @@
     function changeBooth() {
       lockMasksImmediately();
       currentBooth = document.getElementById('booth-select').value;
+      localStorage.setItem('selected_booth', currentBooth);
       updateBoothTitle();
-      lastRenderedBlock = -1; // 強制重繪新攤位的 QR Code
+      lastRenderedBlock = -1;
       syncWithSystemClock();
     }
 
@@ -253,7 +275,7 @@
     function updateQRCode(timeBlock) {
       const payload = 'booth:' + currentBooth + ':t:' + timeBlock;
 
-      const boothNum = parseInt(currentBooth.replace("B", ""));
+      const boothNum = parseInt(currentBooth.replace("B", ""), 10);
       const dynamicRescueCode = generateDynamicPin(boothNum, timeBlock);
       document.getElementById('rescue-code').innerText = dynamicRescueCode;
 
@@ -270,7 +292,6 @@
       });
     }
 
-    // 直接從系統時鐘反推 180 秒時間區塊與剩餘秒數，徹底消除休眠漂移
     function syncWithSystemClock() {
       const now = new Date();
       document.getElementById('clock-display').innerText = now.toTimeString().split(' ')[0];
