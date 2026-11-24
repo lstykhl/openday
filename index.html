@@ -1160,13 +1160,21 @@
       animationFrameId = requestAnimationFrame(scanQRCode);
     }
 
-    function handleScannedData(data) {
+function handleScannedData(data) {
       if (!checkSystemAndSessionGuard()) return;
       if (data.startsWith("booth:")) {
         const parts = data.split(":");
         const boothId = parts[1];
-        if (parts.length >= 4 && parts[2] === "t") {
+        if (parts.length >= 6 && parts[2] === "t" && parts[4] === "s") {
           const qrTimeBlock = parseInt(parts[3], 10);
+          const qrSig = parts[5];
+          const expectedSig = computeClientHash(boothId + "|" + qrTimeBlock + "|" + SECURITY_SALT).slice(0, 6);
+
+          if (qrSig !== expectedSig) {
+            alert("⚠️ 無效的攤位防偽簽章！");
+            return;
+          }
+
           const currentBlock = Math.floor(Date.now() / (1000 * 180));
           if (Math.abs(currentBlock - qrTimeBlock) <= 1) {
             addStamp(boothId, qrTimeBlock);
