@@ -310,6 +310,7 @@
   <script>
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzA4Iuflm5N6faXsrUXPQ8Q68VNfcDysS_3ru281wLymPPxzt92fliq2k7Of0pIdCBcHw/exec";
     const SECURITY_SALT = "LSTYKHL_2026_OD_SEC_9941";
+    const MIN_MOVE_INTERVAL_MS = 10000; // 物理移動限制：登記後到首印、以及相鄰兩印之間至少需 10 秒
     
     let TOTAL_BOOTHS = 19;
     let MIN_STAMPS_SMALL = 1;
@@ -317,7 +318,7 @@
     let MIN_STAMPS_BIG = 16;
     let MIN_STAMPS_GRAND = 19;
 
-    // 確保 guestId 嚴格符合 visitor_ + 9 位小寫英數字；若被竄改則自動重建
+    // 確保 guestId 嚴格符合 visitor_ + 9 位小寫英數字
     let guestId = localStorage.getItem('guest_id');
     if (!guestId || !/^visitor_[a-z0-9]{9}$/.test(guestId)) {
       const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -327,6 +328,13 @@
       }
       guestId = 'visitor_' + randPart;
       localStorage.setItem('guest_id', guestId);
+    }
+
+    // 記錄初次開啟／登記時間戳記
+    let regTs = parseInt(localStorage.getItem('guest_reg_ts'), 10);
+    if (!regTs || isNaN(regTs)) {
+      regTs = Date.now();
+      localStorage.setItem('guest_reg_ts', String(regTs));
     }
 
     let userRole = localStorage.getItem('user_role') || '';
@@ -339,7 +347,6 @@
     let isRedeeming = false;
     let syncDebounceTimer = null;
 
-    // 輕量確定性雜湊，與後端 code.gs 完全一致
     function computeClientHash(str) {
       let h1 = 0xdeadbeef;
       let h2 = 0x41c6ce57;
@@ -353,7 +360,6 @@
       return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
     }
 
-    // 工作坊狀態管理
     let allWorkshopsData = [];
     let isWorkshopsExpanded = false;
     const WORKSHOPS_COLLAPSED_LIMIT = 4;
@@ -515,7 +521,9 @@
 
     function selectRole(role) {
       userRole = role;
+      regTs = Date.now();
       localStorage.setItem('user_role', role);
+      localStorage.setItem('guest_reg_ts', String(regTs));
       document.getElementById('role-modal').classList.add('hidden');
       updateRoleBadge();
       syncToBackend(false);
@@ -547,12 +555,13 @@
       const prizeTypes = redemptionHistory.map(item => typeof item === 'object' ? item.type : item);
       const prizeStr = prizeTypes.length > 0 ? prizeTypes.join(', ') : "None";
       const sig = computeClientHash(
-        guestId + "|" + userRole + "|" + userStamps.join(",") + "|" + prizeStr + "|" + foodRedeemed + "|" + SECURITY_SALT
+        guestId + "|" + userRole + "|" + regTs + "|" + userStamps.join(",") + "|" + prizeStr + "|" + foodRedeemed + "|" + SECURITY_SALT
       );
 
       const payload = {
         guestId: guestId,
         role: userRole,
+        regTs: regTs,
         stamps: userStamps,
         proofs: stampProofs,
         redeemedPrize: prizeStr,
@@ -703,7 +712,7 @@
               <div class="font-black text-sm text-neo-black break-words">${item.title}</div>
               <div class="text-xs font-bold text-slate-600 mt-0.5">地點：${item.location}</div>
             </div>
-            <span class="bg-neo-yellow border-2 border-neo-black font-black text-xs px-2 py-1 shrink-0 font-mono">${item.time}</span>
+            <span class="bg-neo-yellow border border-neo-black font-black text-xs px-2 py-1 shrink-0 font-mono">${item.time}</span>
           `;
         }
         container.appendChild(row);
@@ -862,26 +871,43 @@
 
     function addStamp(boothId, verifiedBlock) {
       const displayName = boothNames[boothId] || boothId;
-      if (!userStamps.includes(boothId)) {
-        const blockToSave = (typeof verifiedBlock === 'number')
-          ? verifiedBlock
-          : Math.floor(Date.now() / (1000 * 180));
-
-        userStamps.push(boothId);
-        stampProofs[boothId] = {
-          t: blockToSave,
-          h: computeClientHash(guestId + "|" + boothId + "|" + blockToSave + "|" + SECURITY_SALT)
-        };
-
-        localStorage.setItem('user_stamps', JSON.stringify(userStamps));
-        localStorage.setItem('stamp_proofs', JSON.stringify(stampProofs));
-        renderBoothGrid();
-        updateProgress();
-        syncToBackend(false);
-        alert(`⚡ 蓋印成功！獲得「${displayName}」印章！`);
-      } else {
+      if (userStamps.includes(boothId)) {
         alert(`💡 已收集過「${displayName}」印章！`);
+        return;
       }
+
+      const nowTs = Date.now();
+      // 檢查距離登記或上一個印章是否已滿 10 秒
+      let lastTs = regTs;
+      userStamps.forEach(b => {
+        if (stampProofs[b] && typeof stampProofs[b].ts === 'number' && stampProofs[b].ts > lastTs) {
+          lastTs = stampProofs[b].ts;
+        }
+      });
+
+      const waitSec = Math.ceil((MIN_MOVE_INTERVAL_MS - (nowTs - lastTs)) / 1000);
+      if (waitSec > 0) {
+        alert(`⏳ 蓋印太快啦！請先體驗攤位活動，約 ${waitSec} 秒後再掃描蓋印。`);
+        return;
+      }
+
+      const blockToSave = (typeof verifiedBlock === 'number')
+        ? verifiedBlock
+        : Math.floor(nowTs / (1000 * 180));
+
+      userStamps.push(boothId);
+      stampProofs[boothId] = {
+        t: blockToSave,
+        ts: nowTs,
+        h: computeClientHash(guestId + "|" + boothId + "|" + blockToSave + "|" + nowTs + "|" + SECURITY_SALT)
+      };
+
+      localStorage.setItem('user_stamps', JSON.stringify(userStamps));
+      localStorage.setItem('stamp_proofs', JSON.stringify(stampProofs));
+      renderBoothGrid();
+      updateProgress();
+      syncToBackend(false);
+      alert(`⚡ 蓋印成功！獲得「${displayName}」印章！`);
     }
 
     let videoStream = null;
