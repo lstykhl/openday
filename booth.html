@@ -124,15 +124,32 @@
     </div>
   </footer>
 
+  <!-- 系統未開放鎖定遮罩 -->
+  <div id="system-closed-modal" class="fixed inset-0 bg-neo-bg/95 hidden z-50 flex items-center justify-center p-6">
+    <div class="bg-white border-8 border-neo-black shadow-neo-2xl p-8 w-full max-w-md space-y-5 text-center">
+      <div class="inline-block bg-neo-red text-white border-4 border-neo-black px-5 py-2 font-black text-xl uppercase rotate-1">
+        🚫 平台尚未開放
+      </div>
+      <h2 class="text-2xl font-black uppercase">樂善堂楊葛小琳中學<br>開放日 2026 電子集章系統</h2>
+      <p class="text-sm font-bold text-slate-700 leading-relaxed border-4 border-neo-black p-4 bg-neo-yellow/40">
+        電子集章平台目前為關閉狀態（尚未開放或已結束），攤位動態蓋印碼暫停顯示。
+      </p>
+      <button onclick="fetchBackendData()" class="w-full py-3.5 bg-neo-violet hover:bg-violet-300 border-4 border-neo-black font-black text-base shadow-neo-md uppercase cursor-pointer">
+        🔄 重新檢查系統狀態
+      </button>
+    </div>
+  </div>
+
   <script>
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzA4Iuflm5N6faXsrUXPQ8Q68VNfcDysS_3ru281wLymPPxzt92fliq2k7Of0pIdCBcHw/exec";
+    const SECURITY_SALT = "LSTYKHL_2026_OD_SEC_9941";
     
-    // 支援網址參數 (?booth=B05) 或記憶上次選擇的攤位，避免誤按重整跳回 B01
     const urlBooth = new URLSearchParams(window.location.search).get('booth');
     let currentBooth = (urlBooth && /^B\d{2}$/i.test(urlBooth))
       ? urlBooth.toUpperCase()
       : (localStorage.getItem('selected_booth') || "B01");
 
+    let isSystemActive = true;
     let qrcodeInstance = null;
     let boothMap = {};
     let totalBooths = 19;
@@ -148,6 +165,9 @@
       startTimers();
       requestScreenWakeLock();
 
+      // 每 3 分鐘同步檢查一次後端系統開關與攤位名稱
+      setInterval(fetchBackendData, 180000);
+
       document.addEventListener('visibilitychange', () => {
         if (!document.hidden) {
           requestScreenWakeLock();
@@ -155,6 +175,19 @@
         }
       });
     });
+
+    function computeClientHash(str) {
+      let h1 = 0xdeadbeef;
+      let h2 = 0x41c6ce57;
+      for (let i = 0; i < str.length; i++) {
+        const ch = str.charCodeAt(i);
+        h1 = Math.imul(h1 ^ ch, 2654435761);
+        h2 = Math.imul(h2 ^ ch, 1597334677);
+      }
+      h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+      h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+      return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
+    }
 
     function loadCachedBoothData() {
       try {
@@ -188,6 +221,7 @@
     }
 
     function revealCodeTemporarily() {
+      if (!isSystemActive) return;
       requestScreenWakeLock();
       const qrMask = document.getElementById('qr-mask');
       const pinMask = document.getElementById('pin-mask');
@@ -204,7 +238,6 @@
 
     function initBoothSelect() {
       const select = document.getElementById('booth-select');
-      const savedValue = select.value || currentBooth;
       select.innerHTML = '';
       
       for (let i = 1; i <= totalBooths; i++) {
@@ -216,7 +249,11 @@
         select.appendChild(option);
       }
       
-      select.value = savedValue;
+      select.value = currentBooth;
+      if (!select.value) {
+        currentBooth = "B01";
+        select.value = currentBooth;
+      }
       updateBoothTitle();
     }
 
@@ -225,6 +262,16 @@
       fetch(GAS_API_URL)
         .then(res => res.json())
         .then(data => {
+          if (data && typeof data.systemActive === 'boolean') {
+            isSystemActive = data.systemActive;
+            if (!isSystemActive) {
+              lockMasksImmediately();
+              document.getElementById('system-closed-modal').classList.remove('hidden');
+            } else {
+              document.getElementById('system-closed-modal').classList.add('hidden');
+            }
+          }
+
           let updated = false;
           if (data && data.config && data.config.totalBooths) {
             if (totalBooths !== data.config.totalBooths) {
@@ -273,7 +320,9 @@
     }
 
     function updateQRCode(timeBlock) {
-      const payload = 'booth:' + currentBooth + ':t:' + timeBlock;
+      // 加入 6 位防偽簽章，徹底防止原地偽造其他攤位 QR Code
+      const qrSig = computeClientHash(currentBooth + "|" + timeBlock + "|" + SECURITY_SALT).slice(0, 6);
+      const payload = 'booth:' + currentBooth + ':t:' + timeBlock + ':s:' + qrSig;
 
       const boothNum = parseInt(currentBooth.replace("B", ""), 10);
       const dynamicRescueCode = generateDynamicPin(boothNum, timeBlock);
