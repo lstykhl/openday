@@ -207,7 +207,7 @@
     </div>
   </div>
 
-  <!-- 24 小時過期失效提示 Modal -->
+  <!-- 24 小時過期失效提示 Modal (僅針對已有試算表紀錄之用戶) -->
   <div id="expired-modal" class="fixed inset-0 bg-neo-black/85 hidden z-[55] flex items-center justify-center p-4">
     <div class="bg-white border-4 border-neo-black shadow-neo-xl p-6 w-full max-w-sm space-y-4 text-center">
       <div class="inline-block bg-neo-red text-white border-4 border-neo-black px-4 py-1.5 font-black text-lg uppercase -rotate-2">
@@ -438,6 +438,15 @@
       }
     }
 
+    // 判斷 Google Sheet 是否已有此用戶的真實紀錄
+    function hasExistingServerRecord() {
+      return localStorage.getItem('has_server_record') === 'true'
+        || Boolean(userRole)
+        || userStamps.length > 0
+        || foodRedeemed
+        || redemptionHistory.length > 0;
+    }
+
     // 檢查系統是否開放及用戶是否在 24 小時有效期限內
     function checkSystemAndSessionGuard() {
       if (!isSystemActive) {
@@ -449,15 +458,23 @@
       }
 
       if (Date.now() - regTs > SESSION_TTL_MS) {
-        stopScanner();
-        document.getElementById('expired-modal').classList.remove('hidden');
-        return false;
+        if (hasExistingServerRecord()) {
+          // 試算表已有紀錄且超過 24 小時，要求清除舊紀錄重來
+          stopScanner();
+          document.getElementById('expired-modal').classList.remove('hidden');
+          return false;
+        } else {
+          // 試算表尚無紀錄（僅曾純預覽網頁），自動靜默刷新起始時間，無需顯示過期
+          regTs = Date.now();
+          localStorage.setItem('guest_reg_ts', String(regTs));
+        }
       }
       return true;
     }
 
     // 清除超過 24 小時的舊紀錄並重新開始
     function resetExpiredSession() {
+      localStorage.removeItem('has_server_record');
       localStorage.removeItem('user_role');
       localStorage.removeItem('user_stamps');
       localStorage.removeItem('stamp_proofs');
@@ -679,20 +696,19 @@
       regTs = Date.now();
       localStorage.setItem('user_role', role);
       localStorage.setItem('guest_reg_ts', String(regTs));
+      localStorage.setItem('has_server_record', 'true');
       document.getElementById('role-modal').classList.add('hidden');
       updateRoleBadge();
-      syncToBackend(false);
+      syncToBackend(true); // 立即寫入試算表，確保伺服器 Reg_Time 與前端時間同步
     }
 
     function updateRoleBadge() { document.getElementById('user-role-badge').innerText = userRole || '訪客'; }
 
     function syncToBackend(immediate = false) {
       if (!isSystemActive) return;
-      if (Date.now() - regTs > SESSION_TTL_MS) {
-        checkSystemAndSessionGuard();
-        return;
-      }
+      if (!checkSystemAndSessionGuard()) return;
 
+      localStorage.setItem('has_server_record', 'true');
       localStorage.setItem('needs_sync', 'true');
       if (!GAS_API_URL || GAS_API_URL.includes("YOUR_GOOGLE_APPS_SCRIPT")) return;
       if (!navigator.onLine) return;
@@ -751,7 +767,10 @@
         .then(res => res.json())
         .then(data => {
           if (data) {
-            localStorage.setItem('cached_backend_data', JSON.stringify(data));
+            // 僅在系統開放時寫入本地快取，避免未開放狀態被快取鎖住
+            if (data.systemActive !== false) {
+              localStorage.setItem('cached_backend_data', JSON.stringify(data));
+            }
             applyBackendPayload(data);
           }
         }).catch(err => console.warn("Fetch error:", err));
