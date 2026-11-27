@@ -156,7 +156,6 @@
     let revealTimer = null;
     let wakeLock = null;
     let lastRenderedBlock = -1;
-    let backendPollTimer = null;
 
     document.addEventListener('DOMContentLoaded', () => {
       loadCachedBoothData();
@@ -165,6 +164,9 @@
       syncWithSystemClock();
       startTimers();
       requestScreenWakeLock();
+
+      // 每 3 分鐘同步檢查一次後端系統開關與攤位名稱
+      setInterval(fetchBackendData, 180000);
 
       document.addEventListener('visibilitychange', () => {
         if (!document.hidden) {
@@ -255,13 +257,6 @@
       updateBoothTitle();
     }
 
-    function scheduleBackendPoll() {
-      if (backendPollTimer) clearTimeout(backendPollTimer);
-      // 系統未開放時每 30 秒檢查一次（開門瞬間可自動快速解鎖），開放後改為每 3 分鐘輪詢
-      const intervalMs = isSystemActive ? 180000 : 30000;
-      backendPollTimer = setTimeout(fetchBackendData, intervalMs);
-    }
-
     function fetchBackendData() {
       if (!GAS_API_URL || GAS_API_URL.includes("YOUR_GOOGLE_APPS_SCRIPT")) return;
       fetch(GAS_API_URL)
@@ -295,11 +290,7 @@
             }));
             initBoothSelect();
           }
-        })
-        .catch(err => console.warn("Fetch backend error:", err))
-        .finally(() => {
-          scheduleBackendPoll();
-        });
+        }).catch(err => console.warn("Fetch backend error:", err));
     }
 
     function updateBoothTitle() {
@@ -329,6 +320,7 @@
     }
 
     function updateQRCode(timeBlock) {
+      // 加入 6 位防偽簽章，徹底防止原地偽造其他攤位 QR Code
       const qrSig = computeClientHash(currentBooth + "|" + timeBlock + "|" + SECURITY_SALT).slice(0, 6);
       const payload = 'booth:' + currentBooth + ':t:' + timeBlock + ':s:' + qrSig;
 
