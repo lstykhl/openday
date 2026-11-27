@@ -48,7 +48,7 @@
       backface-visibility: hidden;
       perspective: 1000px;
       transform: translateZ(0);
-      animation: marquee-smooth var(--marquee-duration, 15s) linear infinite;
+      animation: marquee-smooth var(--marquee-duration, 25s) linear infinite;
     }
 
     .marquee-content {
@@ -72,7 +72,7 @@
 </head>
 <body class="text-neo-black font-sans pb-24 selection:bg-neo-yellow">
 
-  <!-- 置頂均速無縫跑馬燈 -->
+  <!-- 置頂無縫跑馬燈 -->
   <div class="sticky top-0 z-40 bg-neo-yellow border-b-4 border-neo-black py-2.5 overflow-hidden shadow-neo-sm">
     <div id="marquee-track" class="marquee-container">
       <div id="marquee-part-1" class="marquee-content font-black text-sm tracking-wide uppercase">
@@ -190,7 +190,7 @@
 
   </main>
 
-  <!-- 系統未開放鎖定遮罩 -->
+  <!-- 系統未開放鎖定遮罩 (當 Configs SYSTEM_ACTIVE 為 FALSE 時觸發) -->
   <div id="system-closed-modal" class="fixed inset-0 bg-neo-bg/95 hidden z-[60] flex items-center justify-center p-4">
     <div class="bg-white border-4 border-neo-black shadow-neo-xl p-6 w-full max-w-sm space-y-4 text-center">
       <img src="https://lunaticarus.github.io/classtools/logo.png" alt="校徽" class="w-16 h-16 mx-auto object-contain bg-white border-2 border-neo-black p-1 shadow-neo-sm">
@@ -343,9 +343,8 @@
   <script>
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzA4Iuflm5N6faXsrUXPQ8Q68VNfcDysS_3ru281wLymPPxzt92fliq2k7Of0pIdCBcHw/exec";
     const SECURITY_SALT = "LSTYKHL_2026_OD_SEC_9941";
-    const MIN_MOVE_INTERVAL_MS = 10000;     // 物理移動限制：登記後到首印、以及相鄰兩印之間至少需 10 秒
-    const SESSION_TTL_MS = 86400000;        // 24 小時有效期限
-    const MARQUEE_SPEED_PX_PER_SEC = 50;    // 走馬燈恆定速度：每秒 50 像素（均速不受字數多寡影響）
+    const MIN_MOVE_INTERVAL_MS = 10000;   // 物理移動限制：登記後到首印、以及相鄰兩印之間至少需 10 秒
+    const SESSION_TTL_MS = 86400000;      // 24 小時有效期限
     
     let isSystemActive = true;
     let TOTAL_BOOTHS = 19;
@@ -363,12 +362,14 @@
       return 'visitor_' + randPart;
     }
 
+    // 確保 guestId 嚴格符合 visitor_ + 9 位小寫英數字
     let guestId = localStorage.getItem('guest_id');
     if (!guestId || !/^visitor_[a-z0-9]{9}$/.test(guestId)) {
       guestId = generateFreshGuestId();
       localStorage.setItem('guest_id', guestId);
     }
 
+    // 記錄初次登記時間戳記
     let regTs = parseInt(localStorage.getItem('guest_reg_ts'), 10);
     if (!regTs || isNaN(regTs)) {
       regTs = Date.now();
@@ -398,6 +399,7 @@
       return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
     }
 
+    // 本地快取自我修復：確保 user_stamps 與 stamp_proofs 結構與雜湊完整一致
     function healLocalStorageState() {
       try {
         const rawStamps = JSON.parse(localStorage.getItem('user_stamps'));
@@ -436,6 +438,7 @@
       }
     }
 
+    // 判斷 Google Sheet 是否已有此用戶的真實紀錄
     function hasExistingServerRecord() {
       return localStorage.getItem('has_server_record') === 'true'
         || Boolean(userRole)
@@ -444,6 +447,7 @@
         || redemptionHistory.length > 0;
     }
 
+    // 檢查系統是否開放及用戶是否在 24 小時有效期限內
     function checkSystemAndSessionGuard() {
       if (!isSystemActive) {
         stopScanner();
@@ -455,10 +459,12 @@
 
       if (Date.now() - regTs > SESSION_TTL_MS) {
         if (hasExistingServerRecord()) {
+          // 試算表已有紀錄且超過 24 小時，要求清除舊紀錄重來
           stopScanner();
           document.getElementById('expired-modal').classList.remove('hidden');
           return false;
         } else {
+          // 試算表尚無紀錄（僅曾純預覽網頁），自動靜默刷新起始時間，無需顯示過期
           regTs = Date.now();
           localStorage.setItem('guest_reg_ts', String(regTs));
         }
@@ -466,6 +472,7 @@
       return true;
     }
 
+    // 清除超過 24 小時的舊紀錄並重新開始
     function resetExpiredSession() {
       localStorage.removeItem('has_server_record');
       localStorage.removeItem('user_role');
@@ -528,8 +535,6 @@
       if (!hasCache) {
         renderBoothGrid();
         updateProgress();
-        // 首次尚無快取時先為預設走馬燈套用均速
-        recalculateMarqueeSpeed();
       }
       updateFoodButton();
 
@@ -647,15 +652,9 @@
       });
     }
 
-    // 依實際渲染像素寬度計算動畫時長，確保無論字數多寡皆維持恆定速度 (50px/s)
-    function recalculateMarqueeSpeed() {
-      const part1 = document.getElementById('marquee-part-1');
-      const track = document.getElementById('marquee-track');
-      if (!part1 || !track) return;
-
-      const contentWidthPx = part1.offsetWidth || 300;
-      const exactDuration = Math.max(8, contentWidthPx / MARQUEE_SPEED_PX_PER_SEC).toFixed(2);
-      track.style.setProperty('--marquee-duration', exactDuration + 's');
+    function calculateMarqueeDuration(formattedText) {
+      const charCount = formattedText.length;
+      return Math.max(15, Math.round(12 + (charCount * 0.45)));
     }
 
     function safelyUpdateMarquee(text) {
@@ -667,15 +666,17 @@
       currentDisplayedMarquee = cleanText;
 
       const formattedText = cleanText.startsWith("⚡") ? cleanText : "⚡ " + cleanText;
+      const dynamicDuration = calculateMarqueeDuration(formattedText);
 
       const part1 = document.getElementById('marquee-part-1');
       const part2 = document.getElementById('marquee-part-2');
+      const track = document.getElementById('marquee-track');
 
-      if (part1 && part2) {
+      if (part1 && part2 && track) {
         requestAnimationFrame(() => {
           part1.innerText = formattedText;
           part2.innerText = formattedText;
-          recalculateMarqueeSpeed();
+          track.style.setProperty('--marquee-duration', dynamicDuration + 's');
 
           setTimeout(() => {
             isUpdatingMarquee = false;
@@ -698,7 +699,7 @@
       localStorage.setItem('has_server_record', 'true');
       document.getElementById('role-modal').classList.add('hidden');
       updateRoleBadge();
-      syncToBackend(true);
+      syncToBackend(true); // 立即寫入試算表，確保伺服器 Reg_Time 與前端時間同步
     }
 
     function updateRoleBadge() { document.getElementById('user-role-badge').innerText = userRole || '訪客'; }
@@ -766,6 +767,7 @@
         .then(res => res.json())
         .then(data => {
           if (data) {
+            // 僅在系統開放時寫入本地快取，避免未開放狀態被快取鎖住
             if (data.systemActive !== false) {
               localStorage.setItem('cached_backend_data', JSON.stringify(data));
             }
@@ -1163,16 +1165,8 @@
       if (data.startsWith("booth:")) {
         const parts = data.split(":");
         const boothId = parts[1];
-        if (parts.length >= 6 && parts[2] === "t" && parts[4] === "s") {
+        if (parts.length >= 4 && parts[2] === "t") {
           const qrTimeBlock = parseInt(parts[3], 10);
-          const qrSig = parts[5];
-          const expectedSig = computeClientHash(boothId + "|" + qrTimeBlock + "|" + SECURITY_SALT).slice(0, 6);
-
-          if (qrSig !== expectedSig) {
-            alert("⚠️ 無效的攤位防偽簽章！");
-            return;
-          }
-
           const currentBlock = Math.floor(Date.now() / (1000 * 180));
           if (Math.abs(currentBlock - qrTimeBlock) <= 1) {
             addStamp(boothId, qrTimeBlock);
@@ -1213,10 +1207,9 @@
         return;
       }
       const currentBlock = Math.floor(Date.now() / (1000 * 180));
-      const maxSearchBooths = Math.max(TOTAL_BOOTHS, 30);
       let matchedBooth = null;
       let matchedBlock = currentBlock;
-      for (let i = 1; i <= maxSearchBooths; i++) {
+      for (let i = 1; i <= TOTAL_BOOTHS; i++) {
         for (let offset = -1; offset <= 1; offset++) {
           const targetBlock = currentBlock + offset;
           const validCode = generateDynamicPin(i, targetBlock);
